@@ -196,6 +196,46 @@ forge script script/SetPrices.s.sol:SetPrices \
 
 [Watch Demo Video](https://github.com/user-attachments/assets/069a2fcc-e38f-4dca-90e3-052a35d0b7f9)
 
+# Workflow
+
+## Step 1 — Payment Initiation
+
+User scans a QR code or manually enters payment details. PharosPay identifies the destination country and local payment rail.
+
+![Flow 1](./screenshots/PharosPay_flow1.png)
+
+---
+
+## Step 2 — Live Quote Generation
+
+The pricing engine fetches live fiat exchange rates and the current PROS market price to generate a settlement quote.
+
+![Flow 2](./screenshots/PharosPay_flow2.png)
+
+---
+
+## Step 3 — Onchain Payment Execution
+
+The user approves the transaction. PROS tokens are transferred, platform fees are collected, and settlement funds are locked onchain.
+
+![Flow 3](./screenshots/PharosPay_flow3.png)
+
+---
+
+## Step 4 — Settlement Processing
+
+Blockchain events trigger the settlement engine, which validates the merchant and routes the payout through the appropriate country adapter.
+
+![Flow 4](./screenshots/PharosPay_flow4.png)
+
+---
+
+## Step 5 — Receipt & Completion
+
+After settlement, the system generates receipts, explorer links, transaction hashes, reference numbers, and settlement records.
+
+![Flow 5](./screenshots/PharosPay_flow5.png)
+
 ## Example Payment Flow
 
 1. **Scan**: A customer scans a merchant's UPI QR code `upi://pay?pa=merchant@upi&pn=Store` on the frontend client.
