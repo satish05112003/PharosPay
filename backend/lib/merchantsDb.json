@@ -1,0 +1,49 @@
+{
+  "MERCHANT_001": {
+    "merchantId": "MERCHANT_001",
+    "businessName": "India Post Payment Bank",
+    "country": "IN",
+    "supportedRails": [
+      "UPI",
+      "Bank Transfer"
+    ],
+    "upiId": "ippb@upi",
+    "bankAccountMasked": "••••••••5678",
+    "ifscMasked": "IPOS••••123",
+    "pixKey": "",
+    "payNowId": "",
+    "achAccountMasked": "",
+    "logoUrl": "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=100&auto=format&fit=crop&q=60",
+    "kycStatus": "APPROVED",
+    "settlementSpeed": "Instant",
+    "beneficiaryId": "BEN_001",
+    "createdAt": "2026-06-07T10:00:00.000Z",
+    "teamMembers": [
+      "postmaster@indiapost.gov.in",
+      "clerk@indiapost.gov.in"
+    ]
+  },
+  "IND_PAY": {
+    "merchantId": "IND_PAY",
+    "businessName": "TEATIME",
+    "country": "IN",
+    "supportedRails": [
+      "UPI"
+    ],
+    "upiId": "9876543210@ybl",
+    "bankAccountMasked": "••••••••7184",
+    "ifscMasked": "SBIN••••999",
+    "pixKey": "",
+    "payNowId": "",
+    "achAccountMasked": "",
+    "logoUrl": "https://images.unsplash.com/photo-1599305445671-ec2c6c34a425?w=100&auto=format&fit=crop&q=60",
+    "kycStatus": "APPROVED",
+    "settlementSpeed": "Instant",
+    "beneficiaryId": "BEN_548",
+    "createdAt": "2026-06-07T09:45:13.531Z",
+    "teamMembers": [
+      "owner@indpay.com",
+      "iloveyoutobabyy@gmail.com"
+    ]
+  }
+}

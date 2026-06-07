@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',system-ui,sans-serif;background:#f1f5f9;min-height:100vh}
+@keyframes scanline{0%{top:10%}50%{top:90%}100%{top:10%}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.page-enter{animation:fadeIn 0.25s ease}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useEffect, useRef, useCallback } = React;
+const C = {
+  primary:"#2563eb", primaryDark:"#1d4ed8", primaryLight:"#eff6ff",
+  success:"#10b981", successLight:"#ecfdf5",
+  warning:"#f59e0b", warningLight:"#fffbeb",
+  danger:"#ef4444", dangerLight:"#fef2f2",
+  bg:"#ffffff", bgSecondary:"#f8fafc", bgTertiary:"#f1f5f9",
+  text:"#0f172a", textSecondary:"#64748b", textTertiary:"#94a3b8",
+  border:"#e2e8f0", borderLight:"#f1f5f9"
+};
+const COUNTRIES=[
+  {id:"in",name:"India",method:"UPI",flag:"🇮🇳",col:"#FF6B35",ph:"name@upi",label:"UPI ID",cur:"INR",rate:83.12},
+  {id:"br",name:"Brazil",method:"PIX",flag:"🇧🇷",col:"#10b981",ph:"CPF, email or key",label:"PIX Key",cur:"BRL",rate:4.97},
+  {id:"sg",name:"Singapore",method:"PayNow",flag:"🇸🇬",col:"#2563eb",ph:"+65 XXXX XXXX",label:"Mobile/NRIC",cur:"SGD",rate:1.34},
+  {id:"us",name:"USA",method:"ACH",flag:"🇺🇸",col:"#6366f1",ph:"Account number",label:"Account No.",cur:"USD",rate:1.0},
+  {id:"th",name:"Thailand",method:"PromptPay",flag:"🇹🇭",col:"#f59e0b",ph:"Phone or Tax ID",label:"PromptPay ID",cur:"THB",rate:35.8},
+  {id:"id",name:"Indonesia",method:"QRIS",flag:"🇮🇩",col:"#ef4444",ph:"QRIS identifier",label:"QRIS ID",cur:"IDR",rate:15750}
+];
+const TXS=[
+  {id:"t1",date:"Jun 06",merchant:"Flipkart India",flag:"🇮🇳",method:"UPI",usd:-14.44,local:"₹1,200",status:"success",hash:"0xab12...f7e3"},
+  {id:"t2",date:"Jun 05",merchant:"Mercado Livre",flag:"🇧🇷",method:"PIX",usd:-68.41,local:"R$340",status:"success",hash:"0xcd34...a2b1"},
+  {id:"t3",date:"Jun 04",merchant:"Grab Singapore",flag:"🇸🇬",method:"PayNow",usd:-20.90,local:"S$28",status:"success",hash:"0xef56...c4d2"},
+  {id:"t4",date:"Jun 03",merchant:"Amazon US",flag:"🇺🇸",method:"ACH",usd:-149.99,local:"$149.99",status:"pending",hash:"0xgh78...e6f3"},
+  {id:"t5",date:"Jun 02",merchant:"Grab Thailand",flag:"🇹🇭",method:"PromptPay",usd:-23.74,local:"฿850",status:"success",hash:"0xij90...g8h4"},
+  {id:"t6",date:"Jun 01",merchant:"Tokopedia",flag:"🇮🇩",method:"QRIS",usd:-15.87,local:"Rp250K",status:"failed",hash:"0xkl12...i0j5"},
+  {id:"t7",date:"May 31",merchant:"Swiggy India",flag:"🇮🇳",method:"UPI",usd:-6.00,local:"₹499",status:"success",hash:"0xmn34...k2l6"},
+  {id:"t8",date:"May 30",merchant:"99Minutos Brazil",flag:"🇧🇷",method:"PIX",usd:-36.22,local:"R$180",status:"success",hash:"0xop56...m4n7"}
+];
+
+// SVG Icon
+const Ic = ({d,s=18,c="currentColor",sw=1.75}) => React.createElement('svg',{width:s,height:s,viewBox:"0 0 24 24",fill:"none",stroke:c,strokeWidth:sw,strokeLinecap:"round",strokeLinejoin:"round"},React.createElement('path',{d}));
+const ICONS={
+  home:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",
+  send:"M22 2L11 13 M22 2l-7 20-4-9-9-4 20-7z",
+  qr:"M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M7 7v.01 M19 7v.01 M7 19v.01 M15 15h2v2h-2z M19 15h2v2h-2z M15 19h2v2h-2z M19 19h2v2h-2z",
+  history:"M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z",
+  wallet:"M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5 M17 12h.01",
+  copy:"M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2 M10 2h8a2 2 0 0 1 2 2v8",
+  check:"M20 6L9 17l-5-5",
+  x:"M18 6L6 18 M6 6l12 12",
+  arrow:"M5 12h14 M12 5l7 7-7 7",
+  arrowL:"M19 12H5 M12 19l-7-7 7-7",
+  share:"M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8 M16 6l-4-4-4 4 M12 2v13",
+  ext:"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3",
+  search:"M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z",
+  dl:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3",
+  disc:"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
+  sw:"M17 1l4 4-4 4 M3 11V9a4 4 0 0 1 4-4h14 M7 23l-4-4 4-4 M21 13v2a4 4 0 0 1-4 4H3",
+  globe:"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
+  cam:"M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  up:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v13",
+  zap:"M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+  plus:"M12 5v14 M5 12h14",
+  shield:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  refresh:"M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
+  alert:"M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 8v4 M12 16h.01"
+};
+
+const Badge = ({s}) => {
+  const m={success:{bg:C.successLight,c:"#065f46",t:"Completed"},pending:{bg:C.warningLight,c:"#92400e",t:"Pending"},failed:{bg:C.dangerLight,c:"#991b1b",t:"Failed"}};
+  const v=m[s]||m.pending;
+  return React.createElement('span',{style:{background:v.bg,color:v.c,fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,letterSpacing:0.3,textTransform:"uppercase",whiteSpace:"nowrap"}},v.t);
+};
+
+const Card = ({children,style={},onClick}) => {
+  const [hov,setHov]=useState(false);
+  return React.createElement('div',{
+    onClick,
+    onMouseEnter:()=>onClick&&setHov(true),
+    onMouseLeave:()=>setHov(false),
+    style:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden",
+      boxShadow:hov&&onClick?"0 4px 20px rgba(37,99,235,0.1)":"0 1px 3px rgba(0,0,0,0.04)",
+      transition:"all 0.2s",cursor:onClick?"pointer":"default",...style}
+  },children);
+};
+
+const Btn = ({children,variant="primary",onClick,disabled,size="md",style={}}) => {
+  const [hov,setHov]=useState(false);
+  const base={display:"inline-flex",alignItems:"center",gap:7,fontWeight:700,border:"none",
+    cursor:disabled?"not-allowed":"pointer",borderRadius:10,transition:"all 0.15s",
+    fontSize:size==="sm"?13:size==="lg"?15:14,
+    padding:size==="sm"?"8px 14px":size==="lg"?"13px 24px":"10px 18px",
+    opacity:disabled?0.5:1,...style};
+  const vs={
+    primary:{background:hov?C.primaryDark:C.primary,color:"#fff"},
+    secondary:{background:hov?C.bgTertiary:C.bgSecondary,color:C.text,border:`1px solid ${C.border}`},
+    ghost:{background:hov?"rgba(0,0,0,0.04)":"transparent",color:C.textSecondary},
+    danger:{background:hov?"#fee2e2":C.dangerLight,color:"#991b1b",border:"1px solid #fca5a5"},
+    success:{background:hov?"#d1fae5":C.successLight,color:"#065f46"}
+  };
+  return React.createElement('button',{style:{...base,...vs[variant]||vs.primary},onClick,disabled,
+    onMouseEnter:()=>setHov(true),onMouseLeave:()=>setHov(false)},children);
+};
+
+const Input = ({label,ph,value,onChange,prefix,style={}}) => {
+  const [foc,setFoc]=useState(false);
+  return React.createElement('div',{style},
+    label && React.createElement('label',{style:{display:"block",fontSize:13,fontWeight:700,color:C.text,marginBottom:6}},label),
+    React.createElement('div',{style:{display:"flex",alignItems:"stretch",border:`1.5px solid ${foc?C.primary:C.border}`,borderRadius:10,overflow:"hidden",background:C.bg,transition:"border-color 0.15s"}},
+      prefix && React.createElement('span',{style:{padding:"0 12px",color:C.textSecondary,fontSize:14,borderRight:`1px solid ${C.border}`,background:C.bgSecondary,display:"flex",alignItems:"center",fontWeight:600}},prefix),
+      React.createElement('input',{placeholder:ph,value,onChange:e=>onChange(e.target.value),
+        onFocus:()=>setFoc(true),onBlur:()=>setFoc(false),
+        style:{flex:1,border:"none",outline:"none",padding:"12px 14px",fontSize:14,background:"transparent",color:C.text}})
+    )
+  );
+};
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+const Dashboard = ({onNav}) => {
+  const stats=[
+    {l:"Wallet Balance",v:"$12,840.50",sub:"+2.4% this month",ic:"wallet",col:C.primary},
+    {l:"Total Payments",v:"284",sub:"Lifetime transactions",ic:"send",col:C.success},
+    {l:"Countries Used",v:"6",sub:"IN, BR, SG, US, TH, ID",ic:"globe",col:"#8b5cf6"},
+    {l:"Monthly Fee",v:"$4.20",sub:"0.8% platform rate",ic:"shield",col:C.warning}
+  ];
+  return React.createElement('div',{className:"page-enter",style:{padding:"24px"}},
+    // Header
+    React.createElement('div',{style:{marginBottom:28}},
+      React.createElement('div',{style:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12}},
+        React.createElement('div',null,
+          React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:0,fontWeight:500}},"Good morning"),
+          React.createElement('h1',{style:{fontSize:22,fontWeight:800,color:C.text,margin:"2px 0 0",letterSpacing:-0.5}},"Welcome back, Alex 👋")
+        ),
+        React.createElement('div',{style:{display:"flex",gap:8}},
+          React.createElement(Btn,{variant:"secondary",size:"sm"},React.createElement(Ic,{d:ICONS.refresh,s:14}),"Refresh"),
+          React.createElement(Btn,{size:"sm",onClick:()=>onNav("payment")},React.createElement(Ic,{d:ICONS.send,s:14,c:"#fff"}),"New Payment")
+        )
+      )
+    ),
+    // Stats Grid
+    React.createElement('div',{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:16,marginBottom:24}},
+      stats.map(s=>React.createElement(Card,{key:s.l,style:{padding:"20px"}},
+        React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},
+          React.createElement('div',null,
+            React.createElement('p',{style:{fontSize:11,fontWeight:700,color:C.textSecondary,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:0.8}},s.l),
+            React.createElement('p',{style:{fontSize:24,fontWeight:800,color:C.text,margin:"0 0 4px",letterSpacing:-0.5}},s.v),
+            React.createElement('p',{style:{fontSize:12,color:C.textSecondary,margin:0}},s.sub)
+          ),
+          React.createElement('div',{style:{width:40,height:40,borderRadius:10,background:s.col+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},
+            React.createElement(Ic,{d:ICONS[s.ic],s:20,c:s.col})
+          )
+        )
+      ))
+    ),
+    // Quick Actions
+    React.createElement(Card,{style:{padding:"20px",marginBottom:24}},
+      React.createElement('h3',{style:{fontSize:14,fontWeight:800,color:C.text,margin:"0 0 14px",textTransform:"uppercase",letterSpacing:0.5}},"Quick Actions"),
+      React.createElement('div',{style:{display:"flex",gap:10,flexWrap:"wrap"}},
+        [{l:"Send Payment",ic:"send",a:()=>onNav("payment")},
+         {l:"Scan QR",ic:"qr",a:()=>onNav("qr")},
+         {l:"View History",ic:"history",a:()=>onNav("history")},
+         {l:"My Wallet",ic:"wallet",a:()=>onNav("wallet")}
+        ].map(a=>React.createElement(Btn,{key:a.l,variant:"secondary",size:"sm",onClick:a.a},
+          React.createElement(Ic,{d:ICONS[a.ic],s:15}),a.l))
+      )
+    ),
+    // Recent Transactions
+    React.createElement(Card,null,
+      React.createElement('div',{style:{padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.border}`}},
+        React.createElement('h3',{style:{fontSize:15,fontWeight:800,color:C.text,margin:0}},"Recent Transactions"),
+        React.createElement(Btn,{variant:"ghost",size:"sm",onClick:()=>onNav("history")},"View all ",React.createElement(Ic,{d:ICONS.arrow,s:14}))
+      ),
+      TXS.slice(0,5).map((tx,i)=>React.createElement('div',{key:tx.id,style:{display:"flex",alignItems:"center",padding:"14px 20px",borderBottom:i<4?`1px solid ${C.borderLight}`:"none",gap:12}},
+        React.createElement('div',{style:{width:42,height:42,borderRadius:12,background:C.bgSecondary,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}},tx.flag),
+        React.createElement('div',{style:{flex:1,minWidth:0}},
+          React.createElement('p',{style:{fontSize:14,fontWeight:700,color:C.text,margin:"0 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},tx.merchant),
+          React.createElement('p',{style:{fontSize:12,color:C.textSecondary,margin:0}},tx.method," · ",tx.date)
+        ),
+        React.createElement('div',{style:{textAlign:"right",flexShrink:0}},
+          React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:"0 0 4px"}},(tx.usd).toFixed(2)," USD"),
+          React.createElement(Badge,{s:tx.status})
+        )
+      ))
+    )
+  );
+};
+
+// ── PAYMENT FLOW ──────────────────────────────────────────────────────────────
+const PaymentFlow = ({onBack}) => {
+  const [step,setStep]=useState(1);
+  const [sc,setSc]=useState(null);
+  const [mid,setMid]=useState("");
+  const [amt,setAmt]=useState("100");
+  const STEPS=["Country","Merchant","Quote","Confirm","Done"];
+  const fee=parseFloat(amt||0)*0.008;
+  const fxAmt=sc?parseFloat(amt||0)*sc.rate:0;
+  const txHash="0x"+Math.random().toString(16).slice(2,10)+"..."+Math.random().toString(16).slice(2,6);
+
+  const StepBar = () => React.createElement('div',{style:{display:"flex",alignItems:"flex-end",marginBottom:28,gap:0}},
+    STEPS.map((s,i)=>React.createElement('div',{key:s,style:{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:"none"}},
+      React.createElement('div',{style:{display:"flex",flexDirection:"column",alignItems:"center",gap:6}},
+        React.createElement('div',{style:{width:30,height:30,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
+          background:step>i+1?C.success:step===i+1?C.primary:C.bgTertiary,
+          color:step>=i+1?"#fff":C.textTertiary,fontSize:12,fontWeight:800,transition:"all 0.3s"}},
+          step>i+1?React.createElement(Ic,{d:ICONS.check,s:13,c:"#fff"}):i+1
+        ),
+        React.createElement('span',{style:{fontSize:10,fontWeight:step===i+1?800:500,color:step===i+1?C.primary:C.textTertiary,whiteSpace:"nowrap"}},s)
+      ),
+      i<STEPS.length-1&&React.createElement('div',{style:{flex:1,height:2,margin:"0 4px",marginBottom:22,background:step>i+1?C.success:C.border,transition:"background 0.3s"}})
+    ))
+  );
+
+  return React.createElement('div',{className:"page-enter",style:{padding:"24px",maxWidth:600,margin:"0 auto"}},
+    React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12,marginBottom:28}},
+      React.createElement('button',{onClick:onBack,style:{background:C.bgSecondary,border:`1px solid ${C.border}`,borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}},
+        React.createElement(Ic,{d:ICONS.arrowL,s:16})
+      ),
+      React.createElement('div',null,
+        React.createElement('h2',{style:{fontSize:20,fontWeight:800,color:C.text,margin:0}},"New Payment"),
+        React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:0}},"Cross-border · Real-time settlement")
+      )
+    ),
+    React.createElement(StepBar,null),
+
+    // Step 1
+    step===1&&React.createElement('div',{className:"page-enter"},
+      React.createElement('h3',{style:{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 4px"}},"Select destination"),
+      React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:"0 0 20px"}},"Choose the recipient's country and payment method"),
+      React.createElement('div',{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(168px,1fr))",gap:12}},
+        COUNTRIES.map(co=>React.createElement(Card,{key:co.id,onClick:()=>{setSc(co);setStep(2);},style:{padding:"18px",border:sc?.id===co.id?`2px solid ${C.primary}`:`1px solid ${C.border}`}},
+          React.createElement('div',{style:{display:"flex",alignItems:"center",gap:10,marginBottom:12}},
+            React.createElement('span',{style:{fontSize:28}},co.flag),
+            React.createElement('div',null,
+              React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:0}},co.name),
+              React.createElement('p',{style:{fontSize:11,color:C.textSecondary,margin:0}},co.cur)
+            )
+          ),
+          React.createElement('span',{style:{display:"inline-block",background:co.col+"18",color:co.col,fontSize:11,fontWeight:800,padding:"4px 12px",borderRadius:20,letterSpacing:0.3}},co.method)
+        ))
+      )
+    ),
+
+    // Step 2
+    step===2&&sc&&React.createElement('div',{className:"page-enter"},
+      React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12,padding:16,background:C.bgSecondary,borderRadius:12,marginBottom:24,border:`1px solid ${C.border}`}},
+        React.createElement('span',{style:{fontSize:32}},sc.flag),
+        React.createElement('div',{style:{flex:1}},
+          React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:0}},sc.name),
+          React.createElement('p',{style:{fontSize:12,color:C.textSecondary,margin:0}},sc.method," · ",sc.cur)
+        ),
+        React.createElement(Btn,{variant:"ghost",size:"sm",onClick:()=>setStep(1)},"Change")
+      ),
+      React.createElement(Input,{label:sc.label,ph:sc.ph,value:mid,onChange:setMid,style:{marginBottom:16}}),
+      React.createElement(Input,{label:"Amount (USD)",ph:"0.00",value:amt,onChange:setAmt,prefix:"$",style:{marginBottom:24}}),
+      React.createElement(Btn,{disabled:!mid||!amt,onClick:()=>setStep(3),style:{width:"100%",justifyContent:"center"},size:"lg"},
+        "Get Quote ",React.createElement(Ic,{d:ICONS.arrow,s:17,c:"#fff"}))
+    ),
+
+    // Step 3
+    step===3&&sc&&React.createElement('div',{className:"page-enter"},
+      React.createElement('h3',{style:{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 4px"}},"Payment Quote"),
+      React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:"0 0 20px"}},"Review the breakdown before sending"),
+      React.createElement(Card,{style:{padding:"20px",marginBottom:16}},
+        [["You send",`$${parseFloat(amt).toFixed(2)} USD`,true,null],
+         ["FX Rate",`1 USD = ${sc.rate.toLocaleString()} ${sc.cur}`,false,C.textSecondary],
+         ["Recipient gets",`${fxAmt.toLocaleString(undefined,{maximumFractionDigits:2})} ${sc.cur}`,true,C.success],
+         ["Platform fee (0.8%)",`-$${fee.toFixed(2)} USD`,false,C.textSecondary],
+         ["Total deducted",`$${(parseFloat(amt)+fee).toFixed(2)} USD`,true,null]
+        ].map(([l,v,bold,col],i)=>React.createElement('div',{key:l,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:i<4?`1px solid ${C.borderLight}`:"none"}},
+          React.createElement('span',{style:{fontSize:14,color:C.textSecondary}},l),
+          React.createElement('span',{style:{fontSize:14,fontWeight:bold?800:600,color:col||C.text}},v)
+        ))
+      ),
+      React.createElement('div',{style:{background:C.primaryLight,borderRadius:10,padding:"12px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:10}},
+        React.createElement(Ic,{d:ICONS.zap,s:16,c:C.primary}),
+        React.createElement('p',{style:{fontSize:13,color:C.primary,fontWeight:700,margin:0}},"Estimated delivery: <30 seconds via ",sc.method)
+      ),
+      React.createElement('div',{style:{display:"flex",gap:10}},
+        React.createElement(Btn,{variant:"secondary",onClick:()=>setStep(2),style:{flex:1,justifyContent:"center"}},"Back"),
+        React.createElement(Btn,{onClick:()=>setStep(4),style:{flex:2,justifyContent:"center"},size:"lg"},"Confirm Payment")
+      )
+    ),
+
+    // Step 4
+    step===4&&sc&&React.createElement('div',{className:"page-enter"},
+      React.createElement('h3',{style:{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 4px"}},"Confirm Payment"),
+      React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:"0 0 20px"}},"Verify all details before proceeding"),
+      React.createElement(Card,{style:{padding:"20px",marginBottom:20}},
+        [[`Destination`,`${sc.flag} ${sc.name} · ${sc.method}`],
+         [sc.label,mid],
+         ["Amount",`$${parseFloat(amt).toFixed(2)} USD`],
+         ["Recipient gets",`${fxAmt.toFixed(2)} ${sc.cur}`],
+         ["Fee",`$${fee.toFixed(2)} USD`]
+        ].map(([l,v],i)=>React.createElement('div',{key:l,style:{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:i<4?`1px solid ${C.borderLight}`:"none"}},
+          React.createElement('span',{style:{fontSize:13,color:C.textSecondary}},l),
+          React.createElement('span',{style:{fontSize:13,fontWeight:700,color:C.text}},v)
+        ))
+      ),
+      React.createElement('div',{style:{background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:10,padding:"12px 16px",marginBottom:24}},
+        React.createElement('p',{style:{fontSize:13,color:"#92400e",fontWeight:600,margin:0}},"⚠️ This action is irreversible. Payments cannot be refunded once processed.")
+      ),
+      React.createElement('div',{style:{display:"flex",gap:10}},
+        React.createElement(Btn,{variant:"secondary",onClick:()=>setStep(3),style:{flex:1,justifyContent:"center"}},"Back"),
+        React.createElement(Btn,{onClick:()=>setStep(5),style:{flex:2,justifyContent:"center",background:C.success},size:"lg"},
+          React.createElement(Ic,{d:ICONS.check,s:17,c:"#fff"}),"Send Now")
+      )
+    ),
+
+    // Step 5
+    step===5&&React.createElement('div',{className:"page-enter",style:{textAlign:"center",padding:"20px 0"}},
+      React.createElement('div',{style:{width:80,height:80,borderRadius:"50%",background:C.successLight,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",border:`3px solid ${C.success}`}},
+        React.createElement(Ic,{d:ICONS.check,s:36,c:C.success})
+      ),
+      React.createElement('h2',{style:{fontSize:24,fontWeight:800,color:C.text,margin:"0 0 8px",letterSpacing:-0.5}},"Payment Sent! 🎉"),
+      React.createElement('p',{style:{fontSize:15,color:C.textSecondary,margin:"0 0 28px"}},"$",parseFloat(amt).toFixed(2)," USD → ",fxAmt.toFixed(2)," ",sc?.cur," via ",sc?.method),
+      React.createElement(Card,{style:{padding:"16px 20px",marginBottom:24,textAlign:"left"}},
+        React.createElement('p',{style:{fontSize:11,fontWeight:800,color:C.textSecondary,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:0.8}},"Transaction Hash"),
+        React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}},
+          React.createElement('code',{style:{fontSize:12,color:C.text,background:C.bgSecondary,padding:"8px 12px",borderRadius:8,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},txHash),
+          React.createElement(Btn,{variant:"secondary",size:"sm"},React.createElement(Ic,{d:ICONS.copy,s:14}),"Copy")
+        )
+      ),
+      React.createElement('div',{style:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}},
+        React.createElement(Btn,{variant:"secondary"},React.createElement(Ic,{d:ICONS.ext,s:16}),"Explorer"),
+        React.createElement(Btn,{variant:"secondary"},React.createElement(Ic,{d:ICONS.share,s:16}),"Share Receipt"),
+        React.createElement(Btn,{onClick:onBack},"Done ✓")
+      )
+    )
+  );
+};
+
+// ── QR SCANNER ────────────────────────────────────────────────────────────────
+const QRScanner = ({onBack}) => {
+  const [mode,setMode]=useState("cam");
+  const [scanning,setScanning]=useState(false);
+  const [scanned,setScanned]=useState(false);
+  const [err,setErr]=useState(null);
+  const [uploaded,setUploaded]=useState(null);
+  const fileRef=useRef();
+
+  const handleScan=()=>{
+    setScanning(true);setScanned(false);
+    setTimeout(()=>{setScanning(false);setScanned(true);},2200);
+  };
+  const handleFile=e=>{
+    const f=e.target.files[0];
+    if(f){setUploaded(f.name);setTimeout(()=>setScanned(true),1000);}
+  };
+
+  return React.createElement('div',{className:"page-enter",style:{padding:"24px",maxWidth:460,margin:"0 auto"}},
+    React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12,marginBottom:24}},
+      React.createElement('button',{onClick:onBack,style:{background:C.bgSecondary,border:`1px solid ${C.border}`,borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}},
+        React.createElement(Ic,{d:ICONS.arrowL,s:16})),
+      React.createElement('h2',{style:{fontSize:20,fontWeight:800,color:C.text,margin:0}},"QR Scanner")
+    ),
+    React.createElement('div',{style:{display:"flex",background:C.bgSecondary,borderRadius:10,padding:4,marginBottom:20}},
+      [["cam",ICONS.cam,"Live Camera"],["up",ICONS.up,"Upload Image"]].map(([id,ic,lbl])=>
+        React.createElement('button',{key:id,onClick:()=>{setMode(id);setScanned(false);setErr(null);setUploaded(null);},
+          style:{flex:1,padding:"9px",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13,
+            display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all 0.15s",
+            background:mode===id?C.bg:"transparent",color:mode===id?C.text:C.textSecondary,
+            boxShadow:mode===id?"0 1px 4px rgba(0,0,0,0.08)":"none"}},
+          React.createElement(Ic,{d:ic,s:15,c:mode===id?C.primary:C.textSecondary}),lbl
+        )
+      )
+    ),
+    mode==="cam"&&React.createElement('div',null,
+      React.createElement(Card,{style:{overflow:"hidden",marginBottom:16}},
+        React.createElement('div',{style:{position:"relative",background:"#0f172a",aspectRatio:"1",display:"flex",alignItems:"center",justifyContent:"center",maxHeight:320}},
+          scanned?React.createElement('div',{style:{textAlign:"center"}},
+            React.createElement('div',{style:{width:64,height:64,borderRadius:"50%",background:"rgba(16,185,129,0.2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}},
+              React.createElement(Ic,{d:ICONS.check,s:32,c:C.success})),
+            React.createElement('p',{style:{color:"#fff",fontWeight:800,fontSize:16,margin:0}},"QR Detected!"),
+            React.createElement('p',{style:{color:"#94a3b8",fontSize:13,margin:"4px 0 0"}},"UPI://flipkart@paytm")
+          ):React.createElement('div',null,
+            [["10%","10%","tl"],["calc(90% - 40px)","10%","tr"],["10%","calc(90% - 40px)","bl"],["calc(90% - 40px)","calc(90% - 40px)","br"]].map(([l,t,k])=>
+              React.createElement('div',{key:k,style:{position:"absolute",left:l,top:t,width:40,height:40,
+                borderTop:k.includes("t")?`3px solid ${C.primary}`:"none",
+                borderBottom:k.includes("b")?`3px solid ${C.primary}`:"none",
+                borderLeft:k.includes("l")?`3px solid ${C.primary}`:"none",
+                borderRight:k.includes("r")?`3px solid ${C.primary}`:"none"}})
+            ),
+            scanning&&React.createElement('div',{style:{position:"absolute",left:"10%",right:"10%",height:2,background:C.primary,boxShadow:`0 0 10px ${C.primary}`,animation:"scanline 2s ease-in-out infinite"}}),
+            React.createElement('div',{style:{textAlign:"center",zIndex:1}},
+              React.createElement('div',{style:{width:56,height:56,borderRadius:"50%",background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}},
+                React.createElement(Ic,{d:ICONS.cam,s:26,c:"#94a3b8"})),
+              React.createElement('p',{style:{color:"#94a3b8",fontSize:13,margin:0}},scanning?"Scanning…":"Align QR code in frame")
+            )
+          )
+        ),
+        React.createElement('div',{style:{padding:"16px 20px"}},
+          React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:"0 0 12px",textAlign:"center"}},
+            scanned?"QR code detected successfully":"Position the QR code within the frame"),
+          !scanned&&React.createElement(Btn,{onClick:handleScan,style:{width:"100%",justifyContent:"center"},size:"lg",disabled:scanning},
+            scanning?"Scanning...":"Start Scanning"),
+          scanned&&React.createElement('div',{style:{display:"flex",gap:10}},
+            React.createElement(Btn,{variant:"secondary",onClick:()=>{setScanned(false);setScanning(false);},style:{flex:1,justifyContent:"center"}},
+              React.createElement(Ic,{d:ICONS.refresh,s:15}),"Rescan"),
+            React.createElement(Btn,{style:{flex:2,justifyContent:"center"}},
+              "Proceed to Payment ",React.createElement(Ic,{d:ICONS.arrow,s:15,c:"#fff"}))
+          )
+        )
+      ),
+      React.createElement('div',{style:{display:"flex",gap:10,marginBottom:12}},
+        React.createElement(Card,{onClick:()=>setErr(err==="perm"?null:"perm"),style:{flex:1,padding:"14px",textAlign:"center",cursor:"pointer"}},
+          React.createElement(Ic,{d:ICONS.alert,s:20,c:C.warning}),
+          React.createElement('p',{style:{fontSize:12,fontWeight:700,color:C.textSecondary,margin:"6px 0 0"}},"Permission")),
+        React.createElement(Card,{onClick:()=>setErr(err==="err"?null:"err"),style:{flex:1,padding:"14px",textAlign:"center",cursor:"pointer"}},
+          React.createElement(Ic,{d:ICONS.x,s:20,c:C.danger}),
+          React.createElement('p',{style:{fontSize:12,fontWeight:700,color:C.textSecondary,margin:"6px 0 0"}},"Error"))
+      ),
+      err==="perm"&&React.createElement('div',{style:{background:C.warningLight,border:"1px solid #fcd34d",borderRadius:10,padding:"14px 16px"}},
+        React.createElement('p',{style:{fontSize:14,fontWeight:800,color:"#92400e",margin:"0 0 4px"}},"Camera Permission Required"),
+        React.createElement('p',{style:{fontSize:13,color:"#92400e",margin:0}},"Allow camera access in your browser settings to use QR scanning.")),
+      err==="err"&&React.createElement('div',{style:{background:C.dangerLight,border:"1px solid #fca5a5",borderRadius:10,padding:"14px 16px"}},
+        React.createElement('p',{style:{fontSize:14,fontWeight:800,color:"#991b1b",margin:"0 0 4px"}},"QR Code Not Recognized"),
+        React.createElement('p',{style:{fontSize:13,color:"#991b1b",margin:0}},"The scanned code is not a valid payment QR. Please try again."))
+    ),
+    mode==="up"&&React.createElement('div',null,
+      React.createElement(Card,{onClick:()=>fileRef.current?.click(),style:{padding:"40px 20px",textAlign:"center",cursor:"pointer",border:`2px dashed ${C.border}`,background:C.bgSecondary}},
+        React.createElement('input',{ref:fileRef,type:"file",accept:"image/*",onChange:handleFile,style:{display:"none"}}),
+        uploaded?React.createElement('div',null,
+          React.createElement('div',{style:{width:56,height:56,borderRadius:"50%",background:C.successLight,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}},
+            React.createElement(Ic,{d:ICONS.check,s:28,c:C.success})),
+          React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:"0 0 4px"}},uploaded),
+          React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:0}},"Processing QR code…")
+        ):React.createElement('div',null,
+          React.createElement('div',{style:{width:56,height:56,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}},
+            React.createElement(Ic,{d:ICONS.up,s:28,c:C.primary})),
+          React.createElement('p',{style:{fontSize:15,fontWeight:800,color:C.text,margin:"0 0 4px"}},"Drop image here"),
+          React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:"0 0 16px"}},"PNG, JPG, WebP supported"),
+          React.createElement(Btn,{variant:"secondary",size:"sm"},"Browse Files")
+        )
+      ),
+      scanned&&React.createElement('div',{style:{marginTop:16}},
+        React.createElement('div',{style:{background:C.successLight,border:"1px solid #a7f3d0",borderRadius:10,padding:"14px 16px",marginBottom:12}},
+          React.createElement('p',{style:{fontSize:14,fontWeight:800,color:"#065f46",margin:"0 0 4px"}},"QR Code Decoded"),
+          React.createElement('p',{style:{fontSize:13,color:"#065f46",margin:0}},"upi://pay?pa=merchant@paytm&am=500&tn=Order123")),
+        React.createElement(Btn,{style:{width:"100%",justifyContent:"center"}},
+          "Proceed to Payment ",React.createElement(Ic,{d:ICONS.arrow,s:15,c:"#fff"}))
+      )
+    )
+  );
+};
+
+// ── TRANSACTION HISTORY ───────────────────────────────────────────────────────
+const History = ({onBack}) => {
+  const [search,setSearch]=useState("");
+  const [filt,setFilt]=useState("all");
+  const [isMob,setIsMob]=useState(window.innerWidth<640);
+  useEffect(()=>{const h=()=>setIsMob(window.innerWidth<640);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  const filtered=TXS.filter(t=>{
+    const ms=t.merchant.toLowerCase().includes(search.toLowerCase())||t.method.toLowerCase().includes(search.toLowerCase());
+    const mf=filt==="all"||t.status===filt;
+    return ms&&mf;
+  });
+  return React.createElement('div',{className:"page-enter",style:{padding:"24px"}},
+    React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12,marginBottom:24,flexWrap:"wrap"}},
+      React.createElement('button',{onClick:onBack,style:{background:C.bgSecondary,border:`1px solid ${C.border}`,borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}},
+        React.createElement(Ic,{d:ICONS.arrowL,s:16})),
+      React.createElement('div',{style:{flex:1}},
+        React.createElement('h2',{style:{fontSize:20,fontWeight:800,color:C.text,margin:0}},"Transactions"),
+        React.createElement('p',{style:{fontSize:13,color:C.textSecondary,margin:0}},filtered.length," records")
+      ),
+      React.createElement(Btn,{variant:"secondary",size:"sm"},React.createElement(Ic,{d:ICONS.dl,s:14}),"Export CSV")
+    ),
+    React.createElement('div',{style:{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}},
+      React.createElement('div',{style:{flex:"1 1 180px",position:"relative"}},
+        React.createElement('div',{style:{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}},
+          React.createElement(Ic,{d:ICONS.search,s:16,c:C.textTertiary})),
+        React.createElement('input',{placeholder:"Search transactions…",value:search,onChange:e=>setSearch(e.target.value),
+          style:{width:"100%",padding:"10px 12px 10px 38px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:14,background:C.bg,color:C.text,outline:"none",boxSizing:"border-box"}})
+      ),
+      React.createElement('div',{style:{display:"flex",gap:6,flexWrap:"wrap"}},
+        ["all","success","pending","failed"].map(s=>
+          React.createElement('button',{key:s,onClick:()=>setFilt(s),
+            style:{padding:"9px 14px",border:`1.5px solid ${filt===s?C.primary:C.border}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+              background:filt===s?C.primaryLight:C.bg,color:filt===s?C.primary:C.textSecondary,textTransform:"capitalize",transition:"all 0.15s"}},s)
+        )
+      )
+    ),
+    isMob?React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:12}},
+      filtered.map(tx=>React.createElement(Card,{key:tx.id,style:{padding:"16px"}},
+        React.createElement('div',{style:{display:"flex",justifyContent:"space-between",marginBottom:10}},
+          React.createElement('div',{style:{display:"flex",alignItems:"center",gap:10}},
+            React.createElement('span',{style:{fontSize:24}},tx.flag),
+            React.createElement('div',null,
+              React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:0}},tx.merchant),
+              React.createElement('p',{style:{fontSize:12,color:C.textSecondary,margin:0}},tx.method)
+            )
+          ),
+          React.createElement(Badge,{s:tx.status})
+        ),
+        React.createElement('div',{style:{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${C.borderLight}`,paddingTop:10}},
+          React.createElement('span',{style:{fontSize:12,color:C.textSecondary}},tx.date),
+          React.createElement('span',{style:{fontSize:15,fontWeight:800,color:C.text}},(tx.usd).toFixed(2)," USD")
+        )
+      ))
+    ):React.createElement(Card,null,
+      React.createElement('div',{style:{overflowX:"auto"}},
+        React.createElement('table',{style:{width:"100%",borderCollapse:"collapse"}},
+          React.createElement('thead',null,
+            React.createElement('tr',{style:{borderBottom:`1px solid ${C.border}`}},
+              ["Date","Merchant","Method","Amount (USD)","Local","Status","Hash"].map(h=>
+                React.createElement('th',{key:h,style:{padding:"12px 16px",fontSize:11,fontWeight:800,color:C.textSecondary,textAlign:"left",textTransform:"uppercase",letterSpacing:0.8,whiteSpace:"nowrap"}},h)
+              )
+            )
+          ),
+          React.createElement('tbody',null,
+            filtered.map((tx,i)=>{
+              const [hov,setHov]=useState(false);
+              return React.createElement('tr',{key:tx.id,
+                onMouseEnter:()=>setHov(true),onMouseLeave:()=>setHov(false),
+                style:{borderBottom:i<filtered.length-1?`1px solid ${C.borderLight}`:"none",background:hov?C.bgSecondary:"transparent",transition:"background 0.15s"}},
+                React.createElement('td',{style:{padding:"14px 16px",fontSize:13,color:C.textSecondary,whiteSpace:"nowrap"}},tx.date),
+                React.createElement('td',{style:{padding:"14px 16px"}},
+                  React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}},
+                    React.createElement('span',{style:{fontSize:18}},tx.flag),
+                    React.createElement('span',{style:{fontSize:14,fontWeight:700,color:C.text}},tx.merchant)
+                  )
+                ),
+                React.createElement('td',{style:{padding:"14px 16px"}},
+                  React.createElement('span',{style:{fontSize:11,fontWeight:800,color:C.primary,background:C.primaryLight,padding:"3px 10px",borderRadius:20}},tx.method)
+                ),
+                React.createElement('td',{style:{padding:"14px 16px",fontSize:14,fontWeight:800,color:C.text}},(tx.usd).toFixed(2)),
+                React.createElement('td',{style:{padding:"14px 16px",fontSize:13,color:C.textSecondary}},tx.local),
+                React.createElement('td',{style:{padding:"14px 16px"}},React.createElement(Badge,{s:tx.status})),
+                React.createElement('td',{style:{padding:"14px 16px"}},
+                  React.createElement('code',{style:{fontSize:11,color:C.textSecondary,background:C.bgSecondary,padding:"3px 8px",borderRadius:6}},tx.hash)
+                )
+              );
+            })
+          )
+        )
+      ),
+      filtered.length===0&&React.createElement('div',{style:{padding:"48px",textAlign:"center"}},
+        React.createElement(Ic,{d:ICONS.history,s:40,c:C.textTertiary}),
+        React.createElement('p',{style:{fontSize:15,color:C.textSecondary,margin:"12px 0 0"}},"No transactions found")
+      )
+    )
+  );
+};
+
+// ── WALLET ────────────────────────────────────────────────────────────────────
+const Wallet = ({onBack}) => {
+  const [copied,setCopied]=useState(false);
+  const addr="0x742d35Cc6634C0532925a3b8D4C9";
+  const wallets=[
+    {n:"MetaMask",ic:"🦊",addr:"0x742d...B8c",bal:"$12,840.50",active:true},
+    {n:"Coinbase Wallet",ic:"🔵",addr:"0x93f1...4aD",bal:"$2,105.00",active:false},
+    {n:"WalletConnect",ic:"🔗",addr:"0xbc71...9eF",bal:"$540.20",active:false}
+  ];
+  const doCopy=()=>{navigator.clipboard?.writeText(addr);setCopied(true);setTimeout(()=>setCopied(false),2000);};
+  return React.createElement('div',{className:"page-enter",style:{padding:"24px",maxWidth:520,margin:"0 auto"}},
+    React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12,marginBottom:28}},
+      React.createElement('button',{onClick:onBack,style:{background:C.bgSecondary,border:`1px solid ${C.border}`,borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}},
+        React.createElement(Ic,{d:ICONS.arrowL,s:16})),
+      React.createElement('h2',{style:{fontSize:20,fontWeight:800,color:C.text,margin:0}},"My Wallet")
+    ),
+    // Balance Card
+    React.createElement('div',{style:{background:`linear-gradient(135deg,${C.primary} 0%,${C.primaryDark} 100%)`,borderRadius:16,padding:"24px",marginBottom:24}},
+      React.createElement('div',{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}},
+        React.createElement('div',null,
+          React.createElement('p',{style:{fontSize:13,opacity:.8,margin:"0 0 4px",fontWeight:600}},"Total Balance"),
+          React.createElement('p',{style:{fontSize:32,fontWeight:800,color:"#fff",margin:0,letterSpacing:-1}},"$12,840.50")
+        ),
+        React.createElement('div',{style:{background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"7px 14px",display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:800,color:"#fff"}},
+          React.createElement('span',null,"🦊"),"MetaMask"
+        )
+      ),
+      React.createElement('div',{style:{display:"flex",alignItems:"center",gap:10}},
+        React.createElement('div',{style:{background:"rgba(255,255,255,0.12)",borderRadius:8,padding:"8px 12px",flex:1}},
+          React.createElement('p',{style:{fontSize:11,opacity:.7,color:"#fff",margin:"0 0 2px",fontWeight:600}},"Address"),
+          React.createElement('p',{style:{fontSize:12,fontWeight:700,color:"#fff",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},addr)
+        ),
+        React.createElement('button',{onClick:doCopy,style:{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},
+          React.createElement(Ic,{d:copied?ICONS.check:ICONS.copy,s:18,c:"#fff"})
+        )
+      )
+    ),
+    // Action Grid
+    React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:24}},
+      [{l:"Copy Address",ic:"copy",v:"secondary"},{l:"View Explorer",ic:"ext",v:"secondary"},
+       {l:"Switch Wallet",ic:"sw",v:"secondary"},{l:"Disconnect",ic:"disc",v:"danger"}
+      ].map(a=>React.createElement(Btn,{key:a.l,variant:a.v,style:{justifyContent:"center"}},
+        React.createElement(Ic,{d:ICONS[a.ic],s:16,c:a.v==="danger"?"#991b1b":C.textSecondary}),a.l
+      ))
+    ),
+    // Connected Wallets
+    React.createElement('h3',{style:{fontSize:14,fontWeight:800,color:C.text,margin:"0 0 12px",textTransform:"uppercase",letterSpacing:0.5}},"Connected Wallets"),
+    React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:10}},
+      wallets.map(w=>React.createElement(Card,{key:w.n,style:{padding:"16px",border:w.active?`2px solid ${C.primary}`:`1px solid ${C.border}`}},
+        React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12}},
+          React.createElement('span',{style:{fontSize:28}},w.ic),
+          React.createElement('div',{style:{flex:1}},
+            React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}},
+              React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:0}},w.n),
+              w.active&&React.createElement('span',{style:{fontSize:10,fontWeight:800,background:C.successLight,color:"#065f46",padding:"2px 8px",borderRadius:10,textTransform:"uppercase",letterSpacing:0.5}},"Active")
+            ),
+            React.createElement('p',{style:{fontSize:12,color:C.textSecondary,margin:"2px 0 0"}},w.addr)
+          ),
+          React.createElement('div',{style:{textAlign:"right"}},
+            React.createElement('p',{style:{fontSize:14,fontWeight:800,color:C.text,margin:0}},w.bal),
+            !w.active&&React.createElement(Btn,{variant:"ghost",size:"sm",style:{padding:"4px 8px",fontSize:12}},"Switch")
+          )
+        )
+      ))
+    )
+  );
+};
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+const App = () => {
+  const [page,setPage]=useState("dashboard");
+  const [isMob,setIsMob]=useState(window.innerWidth<768);
+  useEffect(()=>{const h=()=>setIsMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  const nav=[
+    {id:"dashboard",ic:"home",lbl:"Dashboard"},
+    {id:"payment",ic:"send",lbl:"Pay"},
+    {id:"qr",ic:"qr",lbl:"Scan"},
+    {id:"history",ic:"history",lbl:"History"},
+    {id:"wallet",ic:"wallet",lbl:"Wallet"}
+  ];
+  const back=()=>setPage("dashboard");
+  const renderPage=()=>{
+    switch(page){
+      case "dashboard":return React.createElement(Dashboard,{onNav:setPage});
+      case "payment":return React.createElement(PaymentFlow,{onBack:back});
+      case "qr":return React.createElement(QRScanner,{onBack:back});
+      case "history":return React.createElement(History,{onBack:back});
+      case "wallet":return React.createElement(Wallet,{onBack:back});
+      default:return React.createElement(Dashboard,{onNav:setPage});
+    }
+  };
+  const Logo = () => React.createElement('div',{style:{display:"flex",alignItems:"center",gap:10}},
+    React.createElement('div',{style:{width:36,height:36,background:C.primary,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center"}},
+      React.createElement(Ic,{d:ICONS.zap,s:20,c:"#fff"})),
+    React.createElement('div',null,
+      React.createElement('p',{style:{fontSize:16,fontWeight:800,color:C.text,margin:0,letterSpacing:-0.5}},"PharosPay"),
+      React.createElement('p',{style:{fontSize:11,color:C.textSecondary,margin:0}},"Global Payments")
+    )
+  );
+  return React.createElement('div',{style:{display:"flex",minHeight:"100vh",fontFamily:"'DM Sans',system-ui,sans-serif",background:C.bgTertiary}},
+    !isMob&&React.createElement('div',{style:{width:220,background:C.bg,borderRight:`1px solid ${C.border}`,padding:"20px 12px",display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",overflowY:"auto",flexShrink:0}},
+      React.createElement('div',{style:{padding:"8px 10px",marginBottom:24}},React.createElement(Logo)),
+      React.createElement('nav',{style:{display:"flex",flexDirection:"column",gap:3,flex:1}},
+        nav.map(n=>React.createElement('button',{key:n.id,onClick:()=>setPage(n.id),
+          style:{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
+            background:page===n.id?C.primaryLight:"transparent",color:page===n.id?C.primary:C.textSecondary,
+            border:"none",borderRadius:10,cursor:"pointer",fontWeight:page===n.id?800:600,fontSize:14,
+            transition:"all 0.15s",width:"100%",textAlign:"left"}},
+          React.createElement(Ic,{d:ICONS[n.ic],s:18,c:page===n.id?C.primary:C.textSecondary}),n.lbl
+        ))
+      ),
+      React.createElement('div',{style:{borderTop:`1px solid ${C.border}`,paddingTop:16,display:"flex",alignItems:"center",gap:10}},
+        React.createElement('div',{style:{width:36,height:36,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:14,color:C.primary,flexShrink:0}},"A"),
+        React.createElement('div',{style:{minWidth:0}},
+          React.createElement('p',{style:{fontSize:13,fontWeight:800,color:C.text,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},"Alex Morgan"),
+          React.createElement('p',{style:{fontSize:11,color:C.textSecondary,margin:0}},"Pro Account")
+        )
+      )
+    ),
+    React.createElement('div',{style:{flex:1,overflow:"auto",paddingBottom:isMob?80:0,minWidth:0}},
+      isMob&&React.createElement('div',{style:{background:C.bg,borderBottom:`1px solid ${C.border}`,padding:"12px 20px",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:10}},
+        React.createElement('div',{style:{width:32,height:32,background:C.primary,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}},
+          React.createElement(Ic,{d:ICONS.zap,s:18,c:"#fff"})),
+        React.createElement('p',{style:{fontSize:16,fontWeight:800,color:C.text,margin:0,flex:1,letterSpacing:-0.3}},"PharosPay"),
+        React.createElement('div',{style:{width:32,height:32,borderRadius:"50%",background:C.primaryLight,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,color:C.primary}},"A")
+      ),
+      renderPage()
+    ),
+    isMob&&React.createElement('div',{style:{position:"fixed",bottom:0,left:0,right:0,background:C.bg,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-around",padding:"6px 0",zIndex:100}},
+      nav.map(n=>React.createElement('button',{key:n.id,onClick:()=>setPage(n.id),
+        style:{display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"7px 14px",
+          background:"transparent",color:page===n.id?C.primary:C.textSecondary,border:"none",cursor:"pointer",
+          fontWeight:page===n.id?800:600,fontSize:10,transition:"all 0.15s"}},
+        React.createElement(Ic,{d:ICONS[n.ic],s:22,c:page===n.id?C.primary:C.textSecondary}),n.lbl
+      ))
+    )
+  );
+};
+
+ReactDOM.render(React.createElement(App), document.getElementById("root"));
+</script>
+</body>
+</html>

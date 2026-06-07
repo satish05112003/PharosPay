@@ -1,0 +1,81 @@
+# ═══════════════════════════════════════════════════════════════
+#  PharosPay Root Git Ignore Rules
+# ═══════════════════════════════════════════════════════════════
+
+# ─── Dependencies ─────────────────────────────────────────────
+node_modules/
+package-lock.json
+yarn-error.log
+pnpm-lock.yaml
+
+# ─── Environment & Secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.env
+**/.env
+**/.env.*
+private_key*
+*.key
+*.pem
+*.pfx
+secrets/
+credentials/
+
+# ─── Build & Artifacts ────────────────────────────────────────
+dist/
+build/
+out/
+bin/
+obj/
+cache/
+.cache/
+.parcel-cache/
+.next/
+.vite/
+.output/
+.nuxt/
+coverage/
+htmlcov/
+*.lcov
+.nyc_output/
+
+# ─── Foundry & Hardhat ───────────────────────────────────────
+artifacts/
+typechain/
+typechain-types/
+cache_hardhat/
+broadcast/
+foundry.lock
+
+# ─── Databases & Logs ─────────────────────────────────────────
+*.log
+*.sqlite
+*.db
+*.db-journal
+*.sqlite3
+pgdata/
+data/
+
+# ─── Operating System ─────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ─── IDE & Workspaces ─────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.classpath
+.settings/
+.agents/
