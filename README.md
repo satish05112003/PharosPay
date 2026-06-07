@@ -198,7 +198,7 @@ forge script script/SetPrices.s.sol:SetPrices \
 
 # Workflow
 
-## Step 1 — Payment Initiation
+## Step 1 - Payment Initiation
 
 User scans a QR code or manually enters payment details. PharosPay identifies the destination country and local payment rail.
 
@@ -206,7 +206,7 @@ User scans a QR code or manually enters payment details. PharosPay identifies th
 
 ---
 
-## Step 2 — Live Quote Generation
+## Step 2 - Live Quote Generation
 
 The pricing engine fetches live fiat exchange rates and the current PROS market price to generate a settlement quote.
 
@@ -214,7 +214,7 @@ The pricing engine fetches live fiat exchange rates and the current PROS market 
 
 ---
 
-## Step 3 — Onchain Payment Execution
+## Step 3 - Onchain Payment Execution
 
 The user approves the transaction. PROS tokens are transferred, platform fees are collected, and settlement funds are locked onchain.
 
@@ -222,7 +222,7 @@ The user approves the transaction. PROS tokens are transferred, platform fees ar
 
 ---
 
-## Step 4 — Settlement Processing
+## Step 4 - Settlement Processing
 
 Blockchain events trigger the settlement engine, which validates the merchant and routes the payout through the appropriate country adapter.
 
@@ -230,7 +230,7 @@ Blockchain events trigger the settlement engine, which validates the merchant an
 
 ---
 
-## Step 5 — Receipt & Completion
+## Step 5 - Receipt & Completion
 
 After settlement, the system generates receipts, explorer links, transaction hashes, reference numbers, and settlement records.
 
