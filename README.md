@@ -192,6 +192,10 @@ forge script script/SetPrices.s.sol:SetPrices \
   --broadcast
 ```
 
+## Demo Video
+
+[Watch Demo Video](https://github.com/user-attachments/assets/069a2fcc-e38f-4dca-90e3-052a35d0b7f9)
+
 ## Example Payment Flow
 
 1. **Scan**: A customer scans a merchant's UPI QR code `upi://pay?pa=merchant@upi&pn=Store` on the frontend client.
