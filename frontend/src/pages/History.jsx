@@ -272,8 +272,8 @@ export default function History({ wallet }) {
                 </div>
                 
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px dashed var(--border-light)", paddingTop: "8px" }}>
-                  <span>PROS Price: ${Number(p.prosPriceAtExecution || 0.214).toFixed(4)}</span>
-                  <span>FX Rate: 1 USD = {Number(p.fxRateAtExecution || 1).toFixed(2)} {p.fiatCurrency}</span>
+                  <span>PROS Price: ${Number(p.prosPriceAtExecution || 0).toFixed(4)}</span>
+                  <span>FX Rate: 1 USD = {Number(p.fxRateAtExecution || 0).toFixed(2)} {p.fiatCurrency}</span>
                 </div>
               </div>
             );
@@ -330,10 +330,10 @@ export default function History({ wallet }) {
                       </td>
                       <td>
                         <div style={{ fontSize: "12px", color: "var(--text)", fontWeight: 600 }}>
-                          PROS: ${Number(p.prosPriceAtExecution || 0.214).toFixed(4)}
+                          PROS: ${Number(p.prosPriceAtExecution || 0).toFixed(4)}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                          1 USD = {Number(p.fxRateAtExecution || 1).toFixed(2)} {p.fiatCurrency}
+                          1 USD = {Number(p.fxRateAtExecution || 0).toFixed(2)} {p.fiatCurrency}
                         </div>
                       </td>
                       <td>

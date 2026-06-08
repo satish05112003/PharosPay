@@ -39,6 +39,21 @@ export default function Home({ wallet }) {
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [prosPrice, setProsPrice] = useState(0.636);
 
+  const [clickCount, setClickCount] = useState(0);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugData, setDebugData] = useState(null);
+
+  const handleHeaderClick = () => {
+    setClickCount(prev => {
+      const next = prev + 1;
+      if (next >= 5) {
+        setShowDebug(curr => !curr);
+        return 0;
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     const fetchRates = async () => {
       try {
@@ -55,6 +70,24 @@ export default function Home({ wallet }) {
     const interval = setInterval(fetchRates, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!showDebug) return;
+    const fetchDebug = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/rates/debug`);
+        const data = await res.json();
+        if (data.success) {
+          setDebugData(data.debug);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch debug rates:", err);
+      }
+    };
+    fetchDebug();
+    const interval = setInterval(fetchDebug, 2000);
+    return () => clearInterval(interval);
+  }, [showDebug]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -75,6 +108,7 @@ export default function Home({ wallet }) {
   const getWeeklyVolumeData = () => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dayVolumes = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+    const dayUsd = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
     
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -84,20 +118,22 @@ export default function Home({ wallet }) {
       if (pDate >= oneWeekAgo) {
         const dayName = days[pDate.getDay()];
         const amt = parseFloat(p.prosAmount) || 0;
+        const rate = parseFloat(p.prosPriceAtExecution) || prosPrice;
         if (dayVolumes[dayName] !== undefined) {
           dayVolumes[dayName] += amt;
+          dayUsd[dayName] += amt * rate;
         }
       }
     });
 
     return [
-      { day: "Mon", vol: dayVolumes.Mon },
-      { day: "Tue", vol: dayVolumes.Tue },
-      { day: "Wed", vol: dayVolumes.Wed },
-      { day: "Thu", vol: dayVolumes.Thu },
-      { day: "Fri", vol: dayVolumes.Fri },
-      { day: "Sat", vol: dayVolumes.Sat },
-      { day: "Sun", vol: dayVolumes.Sun }
+      { day: "Mon", vol: dayVolumes.Mon, usd: dayUsd.Mon },
+      { day: "Tue", vol: dayVolumes.Tue, usd: dayUsd.Tue },
+      { day: "Wed", vol: dayVolumes.Wed, usd: dayUsd.Wed },
+      { day: "Thu", vol: dayVolumes.Thu, usd: dayUsd.Thu },
+      { day: "Fri", vol: dayVolumes.Fri, usd: dayUsd.Fri },
+      { day: "Sat", vol: dayVolumes.Sat, usd: dayUsd.Sat },
+      { day: "Sun", vol: dayVolumes.Sun, usd: dayUsd.Sun }
     ];
   };
 
@@ -193,18 +229,19 @@ export default function Home({ wallet }) {
   const countriesBreakdown = getCountryBreakdown();
   const recentTx = payments.slice(0, 5); // latest 5 transactions
 
-  const volumeUSD = (parseFloat(globalStats.volume) * prosPrice);
-  const feesSaved = (volumeUSD * 0.038).toFixed(2); // estimated 3.8% savings compared to standard international wires
+  const userVolPROS = payments.reduce((acc, p) => acc + (parseFloat(p.prosAmount) || 0), 0);
+  const userVolUSD = payments.reduce((acc, p) => acc + ((parseFloat(p.prosAmount) || 0) * (parseFloat(p.prosPriceAtExecution) || prosPrice)), 0);
+  const userFeesUSD = payments.reduce((acc, p) => acc + ((parseFloat(p.feeAmount) || 0) * (parseFloat(p.prosPriceAtExecution) || prosPrice)), 0);
 
   const statsItems = [
     { label: "Total Payments", value: wallet.isConnected ? userPaymentCount.toString() : "0", sub: `${globalStats.paymentCount} globally`, icon: "send", color: "#2563eb" },
-    { label: "Total Volume", value: `${parseFloat(globalStats.volume).toFixed(1)} PROS`, sub: `≈ $${volumeUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD`, icon: "zap", color: "#10b981" },
-    { label: "Fees Saved", value: `$${feesSaved} USD`, sub: "1.2% platform rate margin", icon: "shield", color: "#8b5cf6" },
+    { label: "Total Volume", value: wallet.isConnected ? `${userVolPROS.toFixed(1)} PROS` : "0.0 PROS", sub: wallet.isConnected ? `≈ $${userVolUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD` : `${parseFloat(globalStats.volume).toFixed(1)} PROS globally`, icon: "zap", color: "#10b981" },
+    { label: "Platform Fees", value: wallet.isConnected ? `$${userFeesUSD.toFixed(2)} USD` : "$0.00 USD", sub: "Based on execution rates", icon: "shield", color: "#8b5cf6" },
     { label: "Active Network", value: wallet.isConnected ? "Pharos Atlantic" : "Offline", sub: wallet.isConnected ? "Chain ID: 688689" : "Connect MetaMask", icon: "globe", color: "#f59e0b" }
   ];
 
   const quickActions = [
-    { label: "Send Payment", icon: "send", desc: "Send instant cross-border crypto-to-fiat payouts.", color: "#2563eb", action: () => navigate('/pay') },
+    { label: "Send Payment", icon: "send", desc: "Send instant cross-border global payouts.", color: "#2563eb", action: () => navigate('/pay') },
     { label: "Scan QR", icon: "qr", desc: "Scan unique merchant QR codes for automated checkout.", color: "#10b981", action: () => navigate('/scan') },
     { label: "View History", icon: "history", desc: "Browse your past transactions, confirmations, and receipts.", color: "#8b5cf6", action: () => navigate('/history') },
     { label: "Wallet", icon: "wallet", desc: "Check your token balances, addresses, and transaction gas.", color: "#f59e0b", action: () => navigate('/wallet') },
@@ -260,7 +297,10 @@ export default function Home({ wallet }) {
       {/* Header Greeting */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: "24px" }}>
         <div>
-          <h1 style={{ fontSize: "22px", fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.5px" }}>
+          <h1 
+            onClick={handleHeaderClick}
+            style={{ fontSize: "22px", fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.5px", cursor: "pointer", userSelect: "none" }}
+          >
             {greeting.text} {greeting.icon}
           </h1>
           <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "8px", fontWeight: 500 }}>
@@ -407,7 +447,7 @@ export default function Home({ wallet }) {
               }}>
                 <div style={{ fontWeight: 800, color: 'var(--text)', marginBottom: '2px' }}>{hoveredPoint.day}</div>
                 <div style={{ color: 'var(--primary)', fontWeight: 800 }}>{hoveredPoint.vol.toFixed(2)} PROS</div>
-                <div style={{ color: 'var(--text-subtitle)' }}>≈ ${(hoveredPoint.vol * prosPrice).toFixed(2)} USD</div>
+                <div style={{ color: 'var(--text-subtitle)' }}>≈ ${hoveredPoint.usd.toFixed(2)} USD</div>
               </div>
             )}
           </div>
@@ -594,6 +634,65 @@ export default function Home({ wallet }) {
           </div>
         )}
       </div>
+
+      {/* DEVELOPER DEBUG PANEL */}
+      {showDebug && (
+        <div className="card" style={{ 
+          marginTop: "28px", 
+          padding: "20px", 
+          background: "var(--bg-secondary)", 
+          border: "2px dashed var(--primary)", 
+          borderRadius: "12px",
+          boxShadow: "var(--shadow-md)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", borderBottom: "1px solid var(--border)", paddingBottom: "10px" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: 800, color: "var(--primary)", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "6px" }}>
+              🔧 Developer Admin Debug Panel
+            </h3>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowDebug(false)} style={{ padding: "4px 8px", fontSize: "11px" }}>Hide</button>
+          </div>
+
+          {!debugData ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-secondary)" }}>
+              <div style={{ width: "12px", height: "12px", border: "1.5px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+              Connecting to Coinbase ticker cache...
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" }}>
+              <div style={{ background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: "10px", color: "var(--text-secondary)", display: "block", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Current PROS Price</span>
+                <strong style={{ fontSize: "16px", color: "var(--text)", fontWeight: 800 }}>${parseFloat(debugData.price || 0).toFixed(4)}</strong>
+              </div>
+              <div style={{ background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: "10px", color: "var(--text-secondary)", display: "block", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Coinbase Status</span>
+                <span className={`badge ${debugData.coinbaseStatus === 'Online' ? 'badge-success' : debugData.coinbaseStatus.includes('Degraded') ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: "12px", padding: "4px 8px", display: "inline-block", fontWeight: 800 }}>
+                  {debugData.coinbaseStatus}
+                </span>
+              </div>
+              <div style={{ background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: "10px", color: "var(--text-secondary)", display: "block", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Cache Age</span>
+                <strong style={{ fontSize: "15px", color: debugData.ageSeconds >= debugData.staleLimitSeconds ? "var(--danger-dark)" : "var(--text)", fontWeight: 800 }}>
+                  {debugData.ageSeconds}s / {debugData.staleLimitSeconds}s max
+                </strong>
+                <div style={{ fontSize: "9px", color: "var(--text-tertiary)", marginTop: "2px" }}>TTL: {debugData.cacheTtlSeconds}s</div>
+              </div>
+              <div style={{ background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: "10px", color: "var(--text-secondary)", display: "block", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Last Refresh</span>
+                <strong style={{ fontSize: "13px", color: "var(--text)", fontWeight: 700 }}>
+                  {new Date(debugData.updatedAt).toLocaleTimeString()}
+                </strong>
+              </div>
+              <div style={{ gridColumn: "span 2", background: "var(--bg)", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: "10px", color: "var(--text-secondary)", display: "block", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Price Source & Timestamp</span>
+                <div style={{ fontSize: "12px", fontFamily: "monospace", color: "var(--text-secondary)", wordBreak: "break-all" }}>
+                  Source: {debugData.source} <br />
+                  Timestamp: {debugData.updatedAt} ({new Date(debugData.updatedAt).toISOString()})
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

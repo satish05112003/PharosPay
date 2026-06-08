@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const priceService = require('./PriceService');
 let PDFDocument;
 try {
   PDFDocument = require('pdfkit');
@@ -29,6 +30,16 @@ class ReceiptGenerator {
     const settlement = await this.db.settlements.findByPaymentId(payment.id);
     const beneficiary = payment.merchant_id ? await this.db.beneficiaries.findById(payment.merchant_id) : null;
 
+    // Resolve dynamic pricing parameters if missing on older records
+    let liveProsPrice = 0.6360;
+    let liveFxRate = 1.0;
+    try {
+      liveProsPrice = await priceService.getProsUsdPrice();
+      liveFxRate = await priceService.getRateValue(payment.fiat_currency);
+    } catch (err) {
+      console.warn('ReceiptGenerator: Failed to fetch live prices for fallback mapping:', err.message);
+    }
+
     return {
       receiptId: payment.id,
       paymentId: payment.id,
@@ -49,10 +60,10 @@ class ReceiptGenerator {
         country: payment.country,
         status: payment.status,
         timestamp: payment.created_at,
-        prosPriceAtExecution: payment.pros_price_at_execution || payment.pros_usd_rate || '0.214',
-        fxRateAtExecution: payment.fx_rate_at_execution || payment.usd_fiat_rate || '1.0',
+        prosPriceAtExecution: payment.pros_price_at_execution || payment.pros_usd_rate || liveProsPrice,
+        fxRateAtExecution: payment.fx_rate_at_execution || payment.usd_fiat_rate || liveFxRate,
         quoteTimestamp: payment.quote_timestamp || payment.created_at,
-        priceSource: payment.price_source || 'PharosOracle'
+        priceSource: payment.price_source || 'Coinbase'
       },
       blockchain: {
         lockTxHash: payment.pharos_lock_tx,

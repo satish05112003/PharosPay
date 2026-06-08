@@ -204,7 +204,11 @@ class SettlementEngine {
       responsePayload: transferResult.rawResponse,
       httpStatusCode: transferResult.status === 'FAILED' ? 400 : 200,
       errorMessage: transferResult.status === 'FAILED' ? 'Transfer failed' : null,
-      durationMs: 100
+      durationMs: 100,
+      prosPriceAtExecution: paymentRecord ? paymentRecord.pros_price_at_execution : null,
+      fxRateAtExecution: paymentRecord ? paymentRecord.fx_rate_at_execution : null,
+      quoteTimestamp: paymentRecord ? paymentRecord.quote_timestamp : null,
+      priceSource: paymentRecord ? paymentRecord.price_source : null
     });
 
     // Step 7: Update settlement with provider reference

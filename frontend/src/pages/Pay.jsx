@@ -257,46 +257,14 @@ export default function Pay({ wallet }) {
 
       if (data.success) {
         setQuote(data.quote);
+        setError(null);
         setStep(4);
       } else {
-        throw new Error(data.message || 'API quote failed');
+        throw new Error(data.error || data.message || 'API quote failed');
       }
     } catch (err) {
-      console.warn('API quote error, using backup rates fetch:', err.message);
-      
-      try {
-        const ratesRes = await fetch(`${API_BASE}/rates`);
-        const ratesData = await ratesRes.json();
-        if (ratesData.success && ratesData.rates) {
-          const prosUsd = ratesData.rates['PROS/USD']?.price || 0.636;
-          const fiatPair = `USD/${selectedCountryInfo.currency}`;
-          const fiatPerUsd = ratesData.rates[fiatPair]?.price || selectedCountryInfo.rate;
-          
-          const usd = parseFloat(amount) / fiatPerUsd;
-          const merchantPros = usd / prosUsd;
-          const fee = merchantPros * 0.02; // 2% platform fee
-          
-          setQuote({
-            fiatAmount: parseFloat(amount),
-            fiatCurrency: selectedCountryInfo.currency,
-            usdAmount: parseFloat(usd.toFixed(6)),
-            prosPrice: prosUsd,
-            fxRate: fiatPerUsd,
-            merchantPros: parseFloat(merchantPros.toFixed(6)),
-            feeAmount: parseFloat(fee.toFixed(6)),
-            feePercent: 2,
-            totalPros: parseFloat((merchantPros + fee).toFixed(6)),
-            lastUpdated: ratesData.rates['PROS/USD']?.updatedAt || new Date().toISOString(),
-            source: ratesData.rates['PROS/USD']?.source || 'ExchangeRatesAPI'
-          });
-          setStep(4);
-          return;
-        }
-      } catch (e) {
-        console.error('Backup rates fetch failed too:', e.message);
-      }
-      
-      setError('Failed to fetch live quote. Please check your network connection.');
+      console.warn('Quote fetch failed:', err.message);
+      setError(err.message === 'Market data unavailable' ? 'Market data unavailable. Refresh quote before paying.' : 'Market data unavailable. Please check connection and retry.');
     } finally {
       setLoadingQuote(false);
     }
@@ -304,6 +272,11 @@ export default function Pay({ wallet }) {
 
   // ─── Execute On-Chain Payment ───────────────────────────────────────────
   const executePayment = async () => {
+    if (secondsSinceUpdate > 300) {
+      setError('Market data unavailable. Refresh quote before paying.');
+      return;
+    }
+
     if (!wallet.signer || !wallet.isConnected) {
       setError('Wallet is not connected.');
       return;
@@ -824,30 +797,39 @@ export default function Pay({ wallet }) {
 
           {/* Live Pricing UI Details */}
           <div className="card" style={{ padding: "16px", marginBottom: "16px", background: "var(--bg-secondary)", border: "1px dashed var(--border)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "13px" }}>
               <div>
-                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px" }}>PROS Price</span>
-                <strong style={{ color: "var(--text)", fontSize: "14px" }}>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>Live PROS Price</span>
+                <strong style={{ color: "var(--text)", fontSize: "15px", fontWeight: 800 }}>
                   ${parseFloat(quote.prosPrice || 0).toFixed(4)}
                 </strong>
               </div>
               <div>
-                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px" }}>FX Rate</span>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>Source</span>
+                <strong style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px", fontSize: "15px", fontWeight: 800 }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--success)" }}></span>
+                  {quote.source || "Coinbase"}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>Updated</span>
+                <strong style={{ color: "var(--text)", fontSize: "14px" }}>
+                  {secondsSinceUpdate} {secondsSinceUpdate === 1 ? "second" : "seconds"} ago
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>FX Rate</span>
                 <strong style={{ color: "var(--text)", fontSize: "14px" }}>
                   1 USD = {parseFloat(quote.fxRate || 0).toFixed(2)} {selectedCountryInfo.currency}
                 </strong>
               </div>
-              <div>
-                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px" }}>Source</span>
-                <strong style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--success)" }}></span>
-                  {quote.source || "CoinGecko"}
-                </strong>
-              </div>
-              <div>
-                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px" }}>Updated</span>
-                <strong style={{ color: "var(--text)" }}>
-                  {secondsSinceUpdate} sec ago
+              <div style={{ gridColumn: "span 2", borderTop: "1px solid var(--border-light)", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "var(--text-secondary)", fontSize: "12px", fontWeight: 600 }}>Quote Refreshes In</span>
+                <strong style={{ color: "var(--primary)", fontFamily: "monospace", fontSize: "16px", fontWeight: 800 }}>
+                  {(() => {
+                    const rem = Math.max(0, 30 - secondsSinceUpdate);
+                    return `00:${rem < 10 ? '0' : ''}${rem}`;
+                  })()}
                 </strong>
               </div>
             </div>
@@ -863,10 +845,10 @@ export default function Pay({ wallet }) {
               marginBottom: "20px"
             }}>
               <div style={{ color: "rgb(239, 68, 68)", fontWeight: 700, fontSize: "14px" }}>
-                Market price unavailable.
+                Market data unavailable.
               </div>
               <div style={{ color: "var(--text)", fontSize: "13px", marginTop: "2px" }}>
-                Please refresh quote.
+                Refresh quote before paying.
               </div>
             </div>
           )}
@@ -939,6 +921,46 @@ export default function Pay({ wallet }) {
             ))}
           </div>
 
+          {/* Live Pricing UI Details */}
+          <div className="card" style={{ padding: "16px", marginBottom: "20px", background: "var(--bg-secondary)", border: "1px dashed var(--border)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "13px" }}>
+              <div>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>Live PROS Price</span>
+                <strong style={{ color: "var(--text)", fontSize: "15px", fontWeight: 800 }}>
+                  ${parseFloat(quote.prosPrice || 0).toFixed(4)}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>Source</span>
+                <strong style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "4px", fontSize: "15px", fontWeight: 800 }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--success)" }}></span>
+                  {quote.source || "Coinbase"}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>Updated</span>
+                <strong style={{ color: "var(--text)", fontSize: "14px" }}>
+                  {secondsSinceUpdate} {secondsSinceUpdate === 1 ? "second" : "seconds"} ago
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-secondary)", display: "block", marginBottom: "2px", fontSize: "11px", textTransform: "uppercase", fontWeight: 700 }}>FX Rate</span>
+                <strong style={{ color: "var(--text)", fontSize: "14px" }}>
+                  1 USD = {parseFloat(quote.fxRate || 0).toFixed(2)} {selectedCountryInfo.currency}
+                </strong>
+              </div>
+              <div style={{ gridColumn: "span 2", borderTop: "1px solid var(--border-light)", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "var(--text-secondary)", fontSize: "12px", fontWeight: 600 }}>Quote Refreshes In</span>
+                <strong style={{ color: "var(--primary)", fontFamily: "monospace", fontSize: "16px", fontWeight: 800 }}>
+                  {(() => {
+                    const rem = Math.max(0, 30 - secondsSinceUpdate);
+                    return `00:${rem < 10 ? '0' : ''}${rem}`;
+                  })()}
+                </strong>
+              </div>
+            </div>
+          </div>
+
           {/* Price Staleness Warning */}
           {secondsSinceUpdate > 300 && (
             <div style={{ 
@@ -949,10 +971,10 @@ export default function Pay({ wallet }) {
               marginBottom: "20px"
             }}>
               <div style={{ color: "rgb(239, 68, 68)", fontWeight: 700, fontSize: "14px" }}>
-                Market price unavailable.
+                Market data unavailable.
               </div>
               <div style={{ color: "var(--text)", fontSize: "13px", marginTop: "2px" }}>
-                Please refresh quote.
+                Refresh quote before paying.
               </div>
             </div>
           )}

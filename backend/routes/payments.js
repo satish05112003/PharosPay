@@ -35,7 +35,11 @@ module.exports = (db) => {
         timestamp: s.created_at,
         status: s.status,
         utr: s.utr,
-        referenceNumber: s.reference_number
+        referenceNumber: s.reference_number,
+        prosPriceAtExecution: s.pros_price_at_execution ? Number(s.pros_price_at_execution) : null,
+        fxRateAtExecution: s.fx_rate_at_execution ? Number(s.fx_rate_at_execution) : null,
+        priceSource: s.price_source,
+        quoteTimestamp: s.quote_timestamp
       }));
 
       res.json({
@@ -86,7 +90,11 @@ module.exports = (db) => {
           created_at: payment.created_at,
           utr: settlement ? settlement.utr : null,
           referenceNumber: settlement ? settlement.reference_number : null,
-          settlementStatus: settlement ? settlement.status : null
+          settlementStatus: settlement ? settlement.status : null,
+          prosPriceAtExecution: payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : null,
+          fxRateAtExecution: payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : null,
+          priceSource: payment.price_source,
+          quoteTimestamp: payment.quote_timestamp
         }
       });
     } catch (err) {

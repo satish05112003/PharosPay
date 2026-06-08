@@ -77,6 +77,14 @@ module.exports = (settlementEngine, db) => {
       query += ` ORDER BY p.created_at DESC`;
       
       const result = await db.query(query, params);
+
+      let liveProsPrice = 0.6360;
+      try {
+        const priceService = require('../services/PriceService');
+        liveProsPrice = await priceService.getProsUsdPrice();
+      } catch (err) {
+        console.warn('SettleRouter: Failed to fetch live price for fallback history mapping:', err.message);
+      }
       
       const history = result.rows.map(s => ({
         id: s.pharos_payment_id || s.id,
@@ -94,10 +102,10 @@ module.exports = (settlementEngine, db) => {
         status: s.status,
         utr: s.utr,
         referenceNumber: s.reference_number,
-        prosPriceAtExecution: s.pros_price_at_execution || s.pros_usd_rate || '0.214',
-        fxRateAtExecution: s.fx_rate_at_execution || s.usd_fiat_rate || '1.0',
+        prosPriceAtExecution: s.pros_price_at_execution || s.pros_usd_rate || liveProsPrice,
+        fxRateAtExecution: s.fx_rate_at_execution || s.usd_fiat_rate || 1.0,
         quoteTimestamp: s.quote_timestamp || s.created_at,
-        priceSource: s.price_source || 'PharosOracle'
+        priceSource: s.price_source || 'Coinbase'
       }));
 
       res.json({

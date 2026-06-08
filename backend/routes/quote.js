@@ -54,13 +54,14 @@ router.get('/quote', async (req, res) => {
       fiatCurrency: currency,
       usdAmount: parseFloat(usdAmount.toFixed(6)),
       prosPrice: liveProsPrice,
+      source: prosDetails.source,
       fxRate: liveFxRate,
       prosAmount: parseFloat(prosAmount.toFixed(6)),
       feeAmount: parseFloat(feeAmount.toFixed(6)),
       feePercent: feeRate / 100,
       totalPros: parseFloat(totalPros.toFixed(6)),
-      lastUpdated: prosDetails.updatedAt,
-      source: prosDetails.source
+      updatedAt: prosDetails.updatedAt,
+      lastUpdated: prosDetails.updatedAt // keep for backwards compatibility
     };
 
     res.json({
@@ -71,7 +72,7 @@ router.get('/quote', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message === 'Market data unavailable' ? 'Market data unavailable' : error.message,
     });
   }
 });
@@ -90,6 +91,19 @@ router.get('/rates', async (req, res) => {
     }
 
     res.json({ success: true, rates });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/rates/debug
+ * Get dynamic cache info and Coinbase status for dev panel.
+ */
+router.get('/rates/debug', async (req, res) => {
+  try {
+    const debugInfo = priceService.getDebugInfo();
+    res.json({ success: true, debug: debugInfo });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

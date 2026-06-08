@@ -4,7 +4,26 @@ import { BrowserQRCodeReader } from '@zxing/browser';
 import { API_BASE } from '../config';
 import { Ic } from './Icons';
 
-const SAMPLE_QR_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEX///8AAABVwtN+AAAACXBIWXMAAA7EAAAOxAGVKw4bAAABk0lEQVRYhdWYvbGEMAyE5SF4oUugFDrDLo1SKIGQgEFvd8XdvJ+5GOEI6yM4mdVKPrOPqzmXDb6ZncOOSFHkTEBm/UDuFr60Tl4OhpKTAduGx+q9+D46SHXvTyCI8fyPL1/sOSS044eNDyEv7WwS/8qs/qjqNhLViFPepo5qHJf2u05zkveqC9QNhbR/RpeQ6OibIx8pBIFz2EbyzMSoa3j0Dg/BLnS94oukJlQNc/BtkmYWdhm4tuUmKk4QxJgPs6orH+8ns7bUxtSLPIR1OF19Oy3BKY9d1Wju9BBqxpMT+gZmJIPz0f+UD3uJpSbsKchnuKrRRFZruUl0mcgnvgKcz1iNmcmsTKTyXjRt6FXNIbcTzptQsVzOqBAMHnKS5AQKOUMh9D9MG+iAlp2wGjnZXc4Xkum5SawgnJWp8bqGa+cl8fOvKZr3ksZpg29nJjH7m3QP7cjzqi85SNz03lMnXc41vz2B0PmCFF76mj2BSCGvCqy6naQm0g7/BYBr6w7Iz5Cd/KhGixg7JJ0vM/m4vgEp3ndt1XaHHQAAAABJRU5ErkJggg==";
+const SAMPLE_QR_BASE64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEX///8AAABVwtN+AAAACXBIWXMAAA7EAAAOxAGVKw4bAAABk0lEQVRYhdWYvbGEMAyE5SF4oUugFDrDLo1SKIGQgEFvd8XdvJ+5GOEI6yM4mdVKPrOPqzmXDb6ZncOOSFHkTEBm/UDuFr60Fl5OhpKTAduGx+q9+D46SHXvTyCI8fyPL1/sOSS044eNDyEv7WwS/8qs/qjqNhLViFPepo5qHJf2u05zkveqC9QNhbR/RpeQ6OibIx8pBIFz2EbyzMSoa3j0Dg/BLnS94oukJlQNc/BtkmYWdhm4tuUmKk4QxJgPs6orH+8ns7bUxtSLPIR1OF19Oy3BKY9d1Wju9BBqxpMT+gZmJIPz0f+UD3uJpSbsKchnuKrRRFZruUl0mcgnvgKcz1iNmcmsTKTyXjRt6FXNIbcTzptQsVzOqBAMHnKS5AQKOUMh9D9MG+iAlp2wGjnZXc4Xkum5SawgnJWp8bqGa+cl8fOvKZr3ksZpg29nJjH7m3QP7cjzqi85SNz03lMnXc41vz2B0PmCFF76mj2BSCGvCqy6naQm0g7/BYBr6w7Iz5Cd/KhGixg7JJ0vM/m4vgEp3ndt1XaHHQAAAABJRU5ErkJggg==";
+
+function EmptyState({ iconName, title, subtitle, children }) {
+  return (
+    <div className="empty-state">
+      <div className="icon-circle" style={{ background: 'var(--primary-light)' }}>
+        <Ic name={iconName} color="var(--primary)" />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+        <h4 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text)', margin: '0 0 6px 0' }}>
+          {title}
+        </h4>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, maxWidth: '280px', lineHeight: '1.4' }}>
+          {subtitle}
+        </p>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function QRScanner({ onScanSuccess }) {
   const [mode, setMode] = useState('cam'); // 'cam' | 'up'
@@ -739,12 +758,11 @@ export default function QRScanner({ onScanSuccess }) {
             )}
 
             {!isScanning && !cameraLoading && !scanSuccess && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justify: 'center' }}>
-                  <Ic name="cam" size={26} color="var(--text-tertiary)" />
-                </div>
-                <p style={{ color: '#94a3b8', fontSize: '13px' }}>Camera is offline</p>
-              </div>
+              <EmptyState 
+                iconName="cam" 
+                title="Camera is offline" 
+                subtitle="Please allow camera access or check your device settings."
+              />
             )}
 
             {isScanning && (
@@ -816,52 +834,39 @@ export default function QRScanner({ onScanSuccess }) {
             onDrop={handleDrop}
             className="card"
             style={{ 
-              padding: '40px 20px', 
-              textAlign: 'center', 
               cursor: 'pointer', 
               border: dragActive ? '2px solid var(--primary)' : '2px dashed var(--border)', 
               background: dragActive ? 'var(--primary-light)' : 'var(--bg-secondary)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              transition: 'var(--transition)'
+              transition: 'var(--transition)',
+              overflow: 'hidden'
             }}
           >
             <input 
               id="qr-file-input" 
               type="file" 
-              accept="image/*" // mobile photo gallery native support
+              accept="image/*"
               onChange={handleFileUpload} 
               style={{ display: 'none' }} 
             />
-            
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justify: 'center' }}>
-              <Ic name="up" size={28} color="var(--primary)" />
-            </div>
-            
-            <div>
-              <p style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text)', marginBottom: '4px' }}>
-                {dragActive ? "Drop the file here" : "Drag & Drop Image or Paste (Ctrl+V)"}
-              </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                PNG, JPG, JPEG, or WEBP supported
-              </p>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-              <button className="btn btn-secondary btn-sm" type="button">
-                Browse Files
-              </button>
-              <button 
-                className="btn btn-primary btn-sm" 
-                type="button"
-                onClick={(e) => { e.stopPropagation(); triggerSampleTest(); }}
-              >
-                Sample QR Test
-              </button>
-            </div>
+
+            <EmptyState
+              iconName="up"
+              title={dragActive ? "Drop the file here" : "Drag & Drop Image or Paste (Ctrl+V)"}
+              subtitle="PNG, JPG, JPEG, or WEBP supported"
+            >
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button className="btn btn-secondary btn-sm" type="button">
+                  Browse Files
+                </button>
+                <button 
+                  className="btn btn-primary btn-sm" 
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); triggerSampleTest(); }}
+                >
+                  Sample QR Test
+                </button>
+              </div>
+            </EmptyState>
           </div>
 
           {/* Decoding Spinner */}
