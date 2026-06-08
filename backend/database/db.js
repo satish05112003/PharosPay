@@ -35,6 +35,8 @@ function initModels(db) {
           models['providerTransactions'] = models['providerTransactions'] || new ModelClass(db);
         } else if (modelName === 'Beneficiary') {
           models['beneficiaries'] = models['beneficiaries'] || new ModelClass(db);
+        } else if (modelName === 'SupportTicket') {
+          models['supportTickets'] = models['supportTickets'] || new ModelClass(db);
         }
       }
     }

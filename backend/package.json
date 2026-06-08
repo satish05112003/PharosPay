@@ -1,7 +1,7 @@
 {
   "name": "pharospay-api",
   "version": "1.0.0",
-  "description": "PharosPay Backend API — QR parsing, price quotes, settlement simulation",
+  "description": "PharosPay Backend API | QR parsing, price quotes, settlement simulation",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,8 +14,11 @@
     "ethers": "^6.13.0",
     "express": "^4.21.0",
     "ioredis": "^5.11.1",
+    "isomorphic-dompurify": "^3.16.0",
+    "nodemailer": "^8.0.10",
     "pdfkit": "^0.19.0",
     "pg": "^8.21.0",
+    "socket.io": "^4.8.3",
     "uuid": "^10.0.0"
   }
 }

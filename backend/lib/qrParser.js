@@ -1,5 +1,5 @@
 /**
- * QR Code Parser — Extracts structured payment data from QR code strings.
+ * QR Code Parser | Extracts structured payment data from QR code strings.
  * 
  * Supported formats:
  *   1. UPI (India):     upi://pay?pa=merchant@bank&pn=Name&am=100&cu=INR

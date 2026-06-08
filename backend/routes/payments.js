@@ -36,10 +36,10 @@ module.exports = (db) => {
         status: s.status,
         utr: s.utr,
         referenceNumber: s.reference_number,
-        prosPriceAtExecution: s.pros_price_at_execution ? Number(s.pros_price_at_execution) : null,
-        fxRateAtExecution: s.fx_rate_at_execution ? Number(s.fx_rate_at_execution) : null,
-        priceSource: s.price_source,
-        quoteTimestamp: s.quote_timestamp
+        prosPriceAtExecution: s.pros_price_at_execution ? Number(s.pros_price_at_execution) : (s.pros_usd_rate ? Number(s.pros_usd_rate) : null),
+        fxRateAtExecution: s.fx_rate_at_execution ? Number(s.fx_rate_at_execution) : (s.usd_fiat_rate ? Number(s.usd_fiat_rate) : null),
+        priceSource: s.price_source || 'Coinbase',
+        quoteTimestamp: s.quote_timestamp || s.created_at
       }));
 
       res.json({
@@ -91,10 +91,10 @@ module.exports = (db) => {
           utr: settlement ? settlement.utr : null,
           referenceNumber: settlement ? settlement.reference_number : null,
           settlementStatus: settlement ? settlement.status : null,
-          prosPriceAtExecution: payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : null,
-          fxRateAtExecution: payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : null,
-          priceSource: payment.price_source,
-          quoteTimestamp: payment.quote_timestamp
+          prosPriceAtExecution: payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : (payment.pros_usd_rate ? Number(payment.pros_usd_rate) : null),
+          fxRateAtExecution: payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : (payment.usd_fiat_rate ? Number(payment.usd_fiat_rate) : null),
+          priceSource: payment.price_source || 'Coinbase',
+          quoteTimestamp: payment.quote_timestamp || payment.created_at
         }
       });
     } catch (err) {

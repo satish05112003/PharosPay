@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { CONTRACTS, ABI } from '../config';
 
 /**
- * useContract — Returns ethers.Contract instances for PharosPay contracts.
+ * useContract | Returns ethers.Contract instances for PharosPay contracts.
  * Provides both read-only (provider) and write (signer) contract instances.
  */
 export function useContract(provider, signer) {

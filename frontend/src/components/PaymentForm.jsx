@@ -137,7 +137,7 @@ export default function PaymentForm({ merchantData, onQuoteReady }) {
         <div className="input-group" style={{ maxWidth: '200px', margin: '0 auto 20px' }}>
           <select value={currency} onChange={(e) => { setCurrency(e.target.value); setQuote(null); }}>
             {Object.entries(CURRENCIES).map(([code, info]) => (
-              <option key={code} value={code}>{info.flag} {code} — {info.name}</option>
+              <option key={code} value={code}>{info.flag} {code} | {info.name}</option>
             ))}
           </select>
         </div>

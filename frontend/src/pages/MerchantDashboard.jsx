@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE, CURRENCIES } from '../config';
 import { Ic } from '../components/Icons';
 
+// Phase 2 Support V2 Imports
+import AIAnalysisCard from '../components/admin/AIAnalysisCard';
+import EscalationTimeline from '../components/admin/EscalationTimeline';
+import TicketAssignModal from '../components/admin/TicketAssignModal';
+import ConversationExport from '../components/admin/ConversationExport';
+import HandoffPanel from '../components/admin/HandoffPanel';
+import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
+
 export default function MerchantDashboard({ wallet }) {
   const [merchantId, setMerchantId] = useState(localStorage.getItem('pharos_merchant_id') || '');
   const [profile, setProfile] = useState(null);
@@ -25,9 +33,19 @@ export default function MerchantDashboard({ wallet }) {
   const [kycProgress, setKycProgress] = useState(0);
 
   // Active dashboard states
-  const [activeTab, setActiveTab] = useState('settlements'); // 'settlements' | 'payout' | 'qr' | 'team'
+  const [activeTab, setActiveTab] = useState('settlements'); // 'settlements' | 'payout' | 'qr' | 'team' | 'support'
   const [settlements, setSettlements] = useState([]);
   const [loadingSettlements, setLoadingSettlements] = useState(false);
+
+  // Support Tickets states
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [supportStats, setSupportStats] = useState(null);
+  const [loadingSupportTickets, setLoadingSupportTickets] = useState(false);
+  const [supportStatusFilter, setSupportStatusFilter] = useState('all');
+  
+  // Support V2 States
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   
   // Team Management states
   const [newTeamEmail, setNewTeamEmail] = useState('');
@@ -56,10 +74,13 @@ export default function MerchantDashboard({ wallet }) {
     }
   }, [merchantId]);
 
-  // Load settlements when tab changes or profile is updated
+  // Load settlements / support when tab changes or profile is updated
   useEffect(() => {
     if (profile && activeTab === 'settlements') {
       fetchSettlements(profile.merchantId);
+    }
+    if (profile && activeTab === 'support') {
+      fetchSupportTickets();
     }
   }, [profile, activeTab]);
 
@@ -113,6 +134,38 @@ export default function MerchantDashboard({ wallet }) {
       console.warn('Failed to load settlements:', err);
     } finally {
       setLoadingSettlements(false);
+    }
+  };
+
+  const fetchSupportTickets = async () => {
+    setLoadingSupportTickets(true);
+    try {
+      const [ticketsRes, statsRes] = await Promise.all([
+        fetch(`${API_BASE}/support/tickets`),
+        fetch(`${API_BASE}/support/stats`),
+      ]);
+      const ticketsData = await ticketsRes.json();
+      const statsData = await statsRes.json();
+      if (ticketsData.success) setSupportTickets(ticketsData.tickets);
+      if (statsData.success) setSupportStats(statsData.stats);
+    } catch (err) {
+      console.warn('Failed to load support data:', err);
+    } finally {
+      setLoadingSupportTickets(false);
+    }
+  };
+
+  const handleUpdateTicketStatus = async (ticketId, newStatus) => {
+    try {
+      const res = await fetch(`${API_BASE}/support/tickets/${ticketId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, resolution: newStatus === 'resolved' ? 'Resolved by merchant admin.' : undefined }),
+      });
+      const data = await res.json();
+      if (data.success) fetchSupportTickets();
+    } catch (err) {
+      alert('Failed to update ticket status');
     }
   };
 
@@ -748,7 +801,9 @@ export default function MerchantDashboard({ wallet }) {
           { id: 'settlements', label: 'Settlements & UTRs', icon: 'history' },
           { id: 'payout', label: 'Payout Account Profile', icon: 'wallet' },
           { id: 'qr', label: 'Generate QR Code', icon: 'qr' },
-          { id: 'team', label: 'Team Members', icon: 'globe' }
+          { id: 'team', label: 'Team Members', icon: 'globe' },
+          { id: 'support', label: 'Support Tickets', icon: 'ticket' },
+          { id: 'analytics', label: 'Support Analytics', icon: 'chart' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1059,6 +1114,225 @@ export default function MerchantDashboard({ wallet }) {
               ))}
             </div>
           </div>
+        )}
+
+        {/* TAB 5: Support Tickets (Admin View) */}
+        {activeTab === 'support' && (
+          <div>
+            {selectedTicketId ? (() => {
+              const ticket = supportTickets.find(t => t.id === selectedTicketId);
+              if (!ticket) return null;
+              return (
+                <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <button 
+                      onClick={() => setSelectedTicketId(null)}
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>←</span> Back to Tickets
+                    </button>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <ConversationExport ticket={ticket} messages={[]} />
+                      <button
+                        onClick={() => setAssignModalOpen(true)}
+                        style={{
+                          background: 'var(--primary, #6366f1)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Assign Agent
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Split Layout */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'start' }}>
+                    {/* Left Pane: Details & takeover panels */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div className="card" style={{ padding: '20px' }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: 800 }}>{ticket.subject}</h3>
+                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap' }}>{ticket.description}</p>
+                      </div>
+                      <HandoffPanel ticketId={ticket.id} onStatusChange={() => {}} />
+                    </div>
+
+                    {/* Right Pane: AI Report Card & timeline */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <AIAnalysisCard ticketId={ticket.id} />
+                      <EscalationTimeline ticketId={ticket.id} />
+                    </div>
+                  </div>
+
+                  <TicketAssignModal 
+                    isOpen={assignModalOpen} 
+                    onClose={() => setAssignModalOpen(false)} 
+                    ticketId={ticket.id} 
+                    currentAgentId={ticket.assignedMerchantId}
+                    onAssigned={(updated) => {
+                      setSupportTickets(prev => prev.map(t => t.id === updated.id ? { ...t, assignedMerchantId: updated.assigned_merchant_id } : t));
+                    }}
+                  />
+                </div>
+              );
+            })() : (
+              <div>
+            {/* Support Stats Row */}
+            {supportStats && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                <div className="card" style={{ padding: '14px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Open</span>
+                  <h3 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--primary)', margin: '6px 0 0 0' }}>{supportStats.open}</h3>
+                </div>
+                <div className="card" style={{ padding: '14px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>In Progress</span>
+                  <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#d97706', margin: '6px 0 0 0' }}>{supportStats.inProgress}</h3>
+                </div>
+                <div className="card" style={{ padding: '14px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Resolved Today</span>
+                  <h3 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--success)', margin: '6px 0 0 0' }}>{supportStats.resolvedToday}</h3>
+                </div>
+                <div className="card" style={{ padding: '14px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Avg Resolution</span>
+                  <h3 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text)', margin: '6px 0 0 0' }}>{supportStats.avgResolutionHours ? `${supportStats.avgResolutionHours}h` : 'N/A'}</h3>
+                </div>
+              </div>
+            )}
+
+            {/* Status Filter */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              {['all', 'open', 'in_progress', 'resolved', 'closed'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSupportStatusFilter(s)}
+                  className={`btn btn-sm ${supportStatusFilter === s ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '11px', textTransform: 'capitalize' }}
+                >
+                  {s === 'all' ? 'All' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>All Tickets</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Manage and triage customer support requests</p>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={fetchSupportTickets}>
+                  <Ic name="refresh" size={13} /> Refresh
+                </button>
+              </div>
+
+              {loadingSupportTickets ? (
+                <div style={{ textAlign: 'center', padding: '30px 0' }}>
+                  <div style={{ width: '24px', height: '24px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }} />
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>Loading tickets...</p>
+                </div>
+              ) : (() => {
+                const filtered = supportTickets.filter(t => supportStatusFilter === 'all' || t.status === supportStatusFilter);
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px 10px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
+                      <Ic name="ticket" size={24} color="var(--text-tertiary)" />
+                      <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', margin: '8px 0 0' }}>No support tickets found</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                          <th style={{ padding: '10px 8px' }}>Ticket</th>
+                          <th style={{ padding: '10px 8px' }}>Subject</th>
+                          <th style={{ padding: '10px 8px' }}>Category</th>
+                          <th style={{ padding: '10px 8px' }}>Priority</th>
+                          <th style={{ padding: '10px 8px' }}>Status</th>
+                          <th style={{ padding: '10px 8px' }}>Created</th>
+                          <th style={{ padding: '10px 8px', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map(t => {
+                          const statusStyles = {
+                            open: { bg: 'var(--primary-light)', color: 'var(--primary)' },
+                            in_progress: { bg: '#fef3c7', color: '#d97706' },
+                            resolved: { bg: '#d1fae5', color: '#059669' },
+                            closed: { bg: 'var(--bg-tertiary)', color: 'var(--text-secondary)' },
+                          };
+                          const priorityColors = { low: '#64748b', medium: '#f59e0b', high: '#ef4444', urgent: '#dc2626' };
+                          const st = statusStyles[t.status] || statusStyles.open;
+                          return (
+                            <tr 
+                              key={t.id} 
+                              onClick={() => setSelectedTicketId(t.id)}
+                              style={{ borderBottom: '1px solid var(--border-light)', cursor: 'pointer' }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <td style={{ padding: '10px 8px', fontFamily: 'monospace', fontWeight: 800, color: 'var(--primary)', fontSize: '11px' }}>{t.ticketNumber}</td>
+                              <td style={{ padding: '10px 8px', fontWeight: 700, color: 'var(--text)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</td>
+                              <td style={{ padding: '10px 8px', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{(t.category || 'general').replace('_', ' ')}</td>
+                              <td style={{ padding: '10px 8px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: priorityColors[t.priority] || '#64748b', fontWeight: 700 }}>
+                                  <Ic name="flag" size={11} color={priorityColors[t.priority] || '#64748b'} />
+                                  {(t.priority || 'medium').charAt(0).toUpperCase() + (t.priority || 'medium').slice(1)}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px 8px' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 700, background: st.bg, color: st.color }}>
+                                  {t.status === 'in_progress' ? 'In Progress' : (t.status || 'open').charAt(0).toUpperCase() + (t.status || 'open').slice(1)}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px 8px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{new Date(t.createdAt).toLocaleDateString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>
+                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                                  {t.status === 'open' && (
+                                    <button className="btn btn-secondary btn-sm" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={(e) => { e.stopPropagation(); handleUpdateTicketStatus(t.id, 'in_progress'); }}>Start</button>
+                                  )}
+                                  {(t.status === 'open' || t.status === 'in_progress') && (
+                                    <button className="btn btn-primary btn-sm" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={(e) => { e.stopPropagation(); handleUpdateTicketStatus(t.id, 'resolved'); }}>Resolve</button>
+                                  )}
+                                  {t.status === 'resolved' && (
+                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: '10px', padding: '3px 8px' }} onClick={(e) => { e.stopPropagation(); handleUpdateTicketStatus(t.id, 'closed'); }}>Close</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+        {/* TAB 6: Support Analytics (Admin View) */}
+        {activeTab === 'analytics' && (
+          <AnalyticsDashboard />
         )}
 
       </div>

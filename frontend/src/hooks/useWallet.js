@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { PHAROS_CHAIN, CONTRACTS, ABI } from '../config';
 
 /**
- * useWallet — Robust MetaMask wallet connector hook for Pharos Atlantic Testnet.
+ * useWallet | Robust MetaMask wallet connector hook for Pharos Atlantic Testnet.
  * Safely handles: connect, disconnect, re-initializing provider/signer on chainChange,
  * and blocking state management during switches.
  */

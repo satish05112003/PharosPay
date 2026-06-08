@@ -4,6 +4,7 @@ import { CONTRACTS, ABI, CURRENCIES } from '../config';
 import { formatPROS, getExplorerTxUrl } from '../hooks/useContract';
 import { Ic } from '../components/Icons';
 import { usePayments } from '../context/PaymentContext';
+import ReceiptViewer from '../components/ReceiptViewer';
 
 export default function History({ wallet }) {
   const { payments, loading: isLoading, refreshPayments } = usePayments();
@@ -14,6 +15,7 @@ export default function History({ wallet }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all"); // all | today | week | month
   const [sortOrder, setSortOrder] = useState("desc"); // desc = newest, asc = oldest
+  const [receiptPayment, setReceiptPayment] = useState(null); // For receipt viewer modal
   
   const [isMob, setIsMob] = useState(window.innerWidth < 640);
 
@@ -275,6 +277,15 @@ export default function History({ wallet }) {
                   <span>PROS Price: ${Number(p.prosPriceAtExecution || 0).toFixed(4)}</span>
                   <span>FX Rate: 1 USD = {Number(p.fxRateAtExecution || 0).toFixed(2)} {p.fiatCurrency}</span>
                 </div>
+
+                <button
+                  onClick={() => setReceiptPayment(p)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ width: '100%', justifyContent: 'center', gap: '6px', marginTop: '8px', fontSize: '12px' }}
+                >
+                  <Ic name="receipt" size={13} color="var(--text-secondary)" />
+                  View Receipt
+                </button>
               </div>
             );
           })}
@@ -293,6 +304,7 @@ export default function History({ wallet }) {
                   <th>PROS Amount</th>
                   <th>Exchange Rates</th>
                   <th>Status</th>
+                  <th>Receipt</th>
                   <th>TxHash Link</th>
                 </tr>
               </thead>
@@ -342,6 +354,16 @@ export default function History({ wallet }) {
                         </span>
                       </td>
                       <td>
+                        <button
+                          onClick={() => setReceiptPayment(p)}
+                          className="btn btn-ghost btn-sm"
+                          style={{ gap: '4px', fontSize: '11px', padding: '4px 8px' }}
+                        >
+                          <Ic name="receipt" size={12} color="var(--primary)" />
+                          View
+                        </button>
+                      </td>
+                      <td>
                         <a 
                           href={getExplorerTxUrl(p.id)} 
                           target="_blank" 
@@ -361,6 +383,14 @@ export default function History({ wallet }) {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Receipt Viewer Modal */}
+      {receiptPayment && (
+        <ReceiptViewer
+          payment={receiptPayment}
+          onClose={() => setReceiptPayment(null)}
+        />
       )}
     </div>
   );

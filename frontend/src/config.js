@@ -27,7 +27,7 @@ export const CONTRACTS = {
 // ─── API ──────────────────────────────────────────────────────────────────
 export const API_BASE = 'http://localhost:3001/api';
 
-// ─── ABIs (minimal — only functions used by frontend) ─────────────────────
+// ─── ABIs (minimal | only functions used by frontend) ─────────────────────
 export const ABI = {
   MockPROS: [
     'function balanceOf(address) view returns (uint256)',

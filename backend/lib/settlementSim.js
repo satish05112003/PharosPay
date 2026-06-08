@@ -1,5 +1,5 @@
 /**
- * Settlement Simulator — Simulates fiat merchant settlement.
+ * Settlement Simulator | Simulates fiat merchant settlement.
  * 
  * In production, this would:
  *   1. Convert PROS → USD via DEX/liquidity pool
@@ -74,7 +74,7 @@ function simulateSettlement({
     prosAmount: prosAmount || null,
     feeAmount: feeAmount || null,
     message: railMessages[paymentRail] || `${currency} ${amount} credited to ${merchantId} via ${paymentRail}. UTR: ${utr}`,
-    disclaimer: 'SIMULATED — No real fiat transfer occurred. In production, this triggers actual bank settlement.',
+    disclaimer: 'SIMULATED | No real fiat transfer occurred. In production, this triggers actual bank settlement.',
   };
 
   settlements.push(settlement);

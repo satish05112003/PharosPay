@@ -7,8 +7,12 @@ import History from './pages/History';
 import Scan from './pages/Scan';
 import Wallet from './pages/Wallet';
 import MerchantDashboard from './pages/MerchantDashboard';
+import Support from './pages/Support';
+import VerifyReceipt from './pages/VerifyReceipt';
+import ReceiptPage from './pages/ReceiptPage';
 import WalletButton from './components/WalletButton';
 import { Ic } from './components/Icons';
+import ErrorBoundary from './components/ErrorBoundary';
 import { PaymentProvider, usePayments } from './context/PaymentContext';
 import './App.css';
 
@@ -26,6 +30,7 @@ const AppHeader = ({ theme, setTheme, wallet, isMob }) => {
     if (pathname.startsWith('/history')) return 'Payment History';
     if (pathname.startsWith('/wallet')) return 'My Wallet';
     if (pathname.startsWith('/merchant')) return 'Merchant OS';
+    if (pathname.startsWith('/support')) return 'Support Center';
     return 'PharosPay';
   };
 
@@ -287,6 +292,7 @@ function Layout() {
     { path: '/history', label: 'History', icon: 'history' },
     { path: '/wallet', label: 'Wallet', icon: 'wallet' },
     { path: '/merchant', label: 'Merchant OS', icon: 'globe' },
+    { path: '/support', label: 'Support', icon: 'help' },
   ];
 
   const isActive = (path) => {
@@ -381,6 +387,13 @@ function Layout() {
             <Route path="/history" element={<History wallet={wallet} />} />
             <Route path="/wallet" element={<Wallet wallet={wallet} />} />
             <Route path="/merchant" element={<MerchantDashboard wallet={wallet} />} />
+            <Route path="/support" element={
+              <ErrorBoundary name="SupportPage">
+                <Support wallet={wallet} />
+              </ErrorBoundary>
+            } />
+            <Route path="/verify" element={<VerifyReceipt />} />
+            <Route path="/receipt/:paymentId" element={<ReceiptPage />} />
           </Routes>
         </main>
       </div>
