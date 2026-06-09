@@ -546,37 +546,49 @@ class AISupportService {
       console.error('[AISupportService] Failed to load history from database:', err.message);
     }
 
-    // 4. Intelligent scope gating (context-aware)
+    // 4. Fetch live PROS price data for injection into system prompt
+    let livePriceData = null;
+    try {
+      const priceRes = await this.db.query(
+        `SELECT pros_price_at_execution, fx_rate_at_execution, fiat_currency, fiat_amount, pros_amount_executed as pros_amount, price_source, created_at
+         FROM payments
+         WHERE pros_price_at_execution IS NOT NULL AND pros_price_at_execution > 0
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      if (priceRes.rows.length > 0) {
+        livePriceData = priceRes.rows[0];
+      }
+    } catch (priceErr) {
+      console.warn('[AISupportService] Failed to fetch live price data:', priceErr.message);
+    }
+
+    // 5. Intelligent scope gating (context-aware)
     const isConversational = this._isConversational(message);
     const isPaymentRelated = this._isPaymentRelated(message);
     const isStrictlyOutOfScope = this._isStrictlyOutOfScope(message);
     const hasHistory = this._hasConversationHistory(dbMessages);
     const knowledgeMatches = PharosKnowledgeService.search(message);
 
-    // Decision logic:
-    // - ALLOW if conversational (greetings, follow-ups, identity questions)
-    // - ALLOW if payment-related (UUIDs, tx hashes, UTR numbers)
-    // - ALLOW if knowledge matches found
-    // - ALLOW if there's conversation history (follow-up messages in active chat)
-    // - BLOCK only if strictly out of scope AND no conversation context
-    const shouldAllowThrough = isConversational || isPaymentRelated || knowledgeMatches.length > 0 || hasHistory;
+    // Price/ecosystem questions always allowed
+    const lower = message.toLowerCase();
+    const isPriceQuery = /\b(price|rate|cost|worth|value|how much|pros.+usd|usd.+pros|conversion|exchange|convert|quote|current|live|market)\b/i.test(lower);
+    const isPharosEcosystem = /\b(pharos|pros|atlantic|testnet|mainnet|explorer|pharosscan|router|oracle|contract|ca|blockchain|roadmap|ecosystem|token|layer.?1|l1|defi|rwa)\b/i.test(lower);
 
-    if (isStrictlyOutOfScope && !isPaymentRelated && !hasHistory) {
+    // Decision logic — VERY permissive for Pharos/payment topics:
+    const shouldAllowThrough = isConversational || isPaymentRelated || knowledgeMatches.length > 0 || hasHistory || isPriceQuery || isPharosEcosystem;
+
+    if (isStrictlyOutOfScope && !isPaymentRelated && !hasHistory && !isPharosEcosystem) {
       console.log(`[AI RESPONSE] StrictOutOfScope blocked message: "${message}"`);
       return {
-        answer: "I appreciate the question, but I'm specifically designed to help with PharosPay and the Pharos ecosystem. I can assist with payments, settlements, wallet issues, receipts, UTR lookups, merchant support, and Pharos blockchain questions.\n\nHow can I help you with any of those?",
+        answer: "I appreciate the question, but I'm specifically designed to help with PharosPay and the Pharos ecosystem. I can assist with payments, settlements, wallet issues, receipts, UTR lookups, and blockchain questions.\n\nHow can I help you with any of those?",
         modelUsed: "ScopeFilter",
         processingMs: Date.now() - startTime
       };
     }
 
     if (!shouldAllowThrough) {
-      console.log(`[AI RESPONSE] ScopeFilter blocked unrecognized message with no history: "${message}"`);
-      return {
-        answer: "I'm the PharosPay Support Assistant. I can help with payments, settlements, wallet activity, receipts, UTR lookups, merchant support, and Pharos ecosystem questions.\n\nCould you tell me more about what you need help with?",
-        modelUsed: "ScopeFilter",
-        processingMs: Date.now() - startTime
-      };
+      console.log(`[AI RESPONSE] ScopeFilter — passing to AI anyway for: "${message}"`);
+      // Pass through instead of hard-blocking; let AI handle gracefully
     }
 
     // 5. Fallback if AI provider is disabled
@@ -614,33 +626,66 @@ class AISupportService {
         "\n--- END CONVERSATION HISTORY ---";
     }
 
-    const systemPrompt = `You are the PharosPay Support Assistant. You help users with PharosPay, the Pharos blockchain, payments, settlements, wallets, receipts, and related topics.
+    // Build live price section for system prompt
+    let livePriceSection = '';
+    if (livePriceData) {
+      const prosPrice = Number(livePriceData.pros_price_at_execution).toFixed(4);
+      const fxRate = livePriceData.fx_rate_at_execution ? Number(livePriceData.fx_rate_at_execution).toFixed(4) : null;
+      const currency = livePriceData.fiat_currency || 'INR';
+      const src = livePriceData.price_source || 'Coinbase';
+      const updatedAt = livePriceData.created_at ? new Date(livePriceData.created_at).toLocaleString() : 'recently';
+      livePriceSection = `
+--- LIVE PROS PRICE DATA (use this when user asks about price) ---
+Current PROS/USD Price: $${prosPrice}
+Price Source: ${src}
+${fxRate ? `FX Rate: 1 USD = ${fxRate} ${currency}` : ''}
+Last known execution: ${updatedAt}
+
+Example calculation for user reference:
+- To pay ${currency === 'INR' ? '₹100' : '100 ' + currency}: divide by FX rate to get USD, then divide by PROS price
+${fxRate ? `- ₹100 = $${(100 / Number(fxRate)).toFixed(4)} USD = ${(100 / Number(fxRate) / Number(livePriceData.pros_price_at_execution)).toFixed(4)} PROS` : ''}
+-------------------------------------------------------------------`;
+    }
+
+    const systemPrompt = `You are the PharosPay Support Assistant — a knowledgeable, friendly expert on the Pharos blockchain ecosystem, PharosPay payments, and crypto-to-fiat technology.
 
 IDENTITY:
-When asked who you are, what you do, or what you can help with, respond naturally:
-- "I'm the PharosPay Support Assistant. I can help with payments, settlements, wallet issues, receipts, UTR lookups, merchant support, and Pharos ecosystem questions."
-- Do NOT recite a corporate description of Pharos blockchain unless specifically asked "What is Pharos?"
+- You are the official PharosPay AI support agent.
+- You answer ALL questions about PharosPay, Pharos blockchain, PROS tokens, payments, settlements, wallets, receipts, and the broader ecosystem.
+- When asked who you are: "I'm the PharosPay Support Assistant. I can help with payments, settlements, wallet issues, PROS pricing, receipts, and all things Pharos."
+
+ANSWER ALL PHAROS ECOSYSTEM QUESTIONS:
+You MUST answer (never refuse) questions like:
+- "What is PROS price?" — Use the live price data above.
+- "What is Pharos?" — Pharos is a high-performance EVM-compatible Layer 1 blockchain.
+- "What is PharosPay?" — Explain the crypto-to-fiat payment protocol.
+- "What is the Atlantic Testnet?" — Chain ID 688689, RPC https://atlantic.dplabs-internal.com
+- "What is the Router Contract?" — 0x7c1B6eeCCb881dA5EBA50Ec1e7202B0De76E11A0
+- "What is the Price Oracle CA?" — 0xe2eD0C7c82195BC462A976dB198d973d395D9805
+- "How do settlements work?" — PROS locked on-chain, fiat sent to merchant via UPI/PIX/etc.
+- "How do receipts work?" — Cryptographic HMAC-SHA256 receipts, downloadable as PDF.
+- "How does the oracle work?" — Fetches PROS/USD price from Coinbase every 30 seconds.
+- "What is the explorer?" — PharosScan at https://pharosscan.xyz/
 
 CONVERSATION RULES:
-1. You are having a CONVERSATION. Read the full chat history. Understand what was discussed before. Reference previous messages when relevant.
-2. Follow-up questions like "Why?", "How?", "Huh?", "What do you mean?", "Can you explain?" ALWAYS refer to the previous message. Answer in that context.
-3. Pronouns like "it", "that", "this", "they" refer to things mentioned earlier. Never ignore context.
-4. NEVER repeat the same response twice. If you catch yourself about to say the same thing, rephrase completely or ask a clarifying question instead.
-5. Keep responses SHORT and HUMAN. 2-4 sentences for simple questions. Only go longer for complex technical explanations.
-6. For greetings (hi, hello, hey): Respond warmly and briefly. Ask how you can help.
-7. For thanks (thank you, thanks): Respond naturally. "You're welcome! Let me know if you need anything else."
-8. For goodbye (bye, see ya): "Take care! Feel free to come back anytime."
+1. ALWAYS read full chat history. Reference previous messages when relevant.
+2. Follow-up questions ("Why?", "How?", "Explain?") refer to the previous message.
+3. Pronouns ("it", "that", "this") refer to things discussed earlier.
+4. NEVER repeat the same response. Rephrase or ask a clarifying question.
+5. Keep responses concise: 2-4 sentences for simple questions, longer for technical ones.
+6. For greetings: respond warmly, ask how you can help.
+7. For thanks: "You're welcome! Let me know if you need anything else."
+8. For goodbye: "Take care! Feel free to come back anytime."
 
-PHAROS KNOWLEDGE (use only when user asks about Pharos):
-- Pharos is a high-performance EVM-compatible Layer 1 blockchain with sub-second finality and near-zero gas fees.
-- PharosPay converts PROS tokens to local fiat currency via UPI, PIX, PayNow, ACH, SEPA.
+PHAROS KNOWLEDGE:
+- Pharos: High-performance EVM L1 blockchain, sub-second finality, near-zero gas fees.
+- PharosPay: Converts PROS tokens to fiat (INR, BRL, SGD, USD, EUR) via UPI, PIX, PayNow, ACH, SEPA.
 - Official Website: https://www.pharos.xyz/
 - Documentation: https://docs.pharos.xyz/
 - Explorer: https://pharosscan.xyz/
 - Atlantic Testnet Chain ID: 688689
-- Price Oracle / Mock PROS Token: 0xe2eD0C7c82195BC462A976dB198d973d395D9805
+- Price Oracle / PROS Token CA: 0xe2eD0C7c82195BC462A976dB198d973d395D9805
 - PharosPay Router Contract: 0x7c1B6eeCCb881dA5EBA50Ec1e7202B0De76E11A0
-- "CA" means Contract Address. Respond with the addresses above.
 
 SUPPORT CAPABILITIES:
 - Payment status lookups, transaction verification
@@ -648,32 +693,26 @@ SUPPORT CAPABILITIES:
 - Receipt finding and verification
 - Wallet connection help, MetaMask setup
 - Merchant onboarding questions
+- PROS price and conversion questions
+- Pharos ecosystem, roadmap, and technical questions
 - Ticket escalation for critical issues
 
 WHEN USER REPORTS CRITICAL ISSUES (lost funds, wrong transfer, scam, large amounts):
 Say: "This requires immediate attention. Let me collect some details to investigate."
-Ask for: wallet address, transaction hash, approximate time, amount involved.
-Then offer to escalate.
+Ask for: wallet address, transaction hash, approximate time, amount involved. Then offer to escalate.
 
-WHEN INFORMATION IS MISSING:
-Ask intelligent follow-up questions. Do not guess or invent data.
-Example: "Could you share the payment ID or transaction hash so I can look into this?"
+WHEN INFORMATION IS MISSING: Ask intelligent follow-up questions. Do not guess.
 
-SCOPE:
-- You handle: Pharos, PharosPay, payments, settlements, receipts, wallets, blockchain, tokens, merchant support.
-- For truly unrelated topics (sports, weather, poems, coding): Politely redirect. "I'm focused on PharosPay support. Is there anything payment or Pharos-related I can help with?"
-- NEVER use a long corporate description as a rejection. Keep rejections short and friendly.
+SCOPE: Only redirect for truly unrelated topics (sports, weather, cooking, movies).
+NEVER say "I can only assist with..." or "I cannot provide..." for Pharos/price questions.
 
 FORMAT:
-- Plain text only. No markdown symbols (no *, #, \`, ~).
+- Plain text only. No markdown symbols (no *, #, backticks, ~).
 - Use line breaks for paragraphs.
 - Be concise and natural.
-- End with a helpful follow-up like "Is there anything else I can help with?" (but not for greetings or rejections).
 
-ANTI-REPETITION:
-- Before responding, consider your last few messages. Do NOT output the same paragraph again.
-- If you already explained something, say "As I mentioned earlier..." and add new information or ask what specifically is unclear.
-
+ANTI-REPETITION: Never output the same paragraph twice in a session.
+${livePriceSection}
 ${retrievedContext ? '\n' + retrievedContext + '\n' : ''}
 --- USER CONTEXT ---
 ${combinedContext}

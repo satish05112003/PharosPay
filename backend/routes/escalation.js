@@ -11,15 +11,13 @@ module.exports = (db) => {
   // ─── POST /api/support/escalate ─────────────────────────────────────────
   router.post('/escalate', async (req, res) => {
     try {
-      const { sessionId, wallet, email, telegram, discord, twitter, description, severity, confidence, ticketId, walletAddress, transactionHash } = req.body;
+      const { sessionId, wallet, email, telegram, discord, twitter, description, severity, confidence, ticketId, transactionHash } = req.body;
+      // walletAddress falls back to wallet if not separately provided
+      const walletAddress = req.body.walletAddress || wallet;
 
       // 1. Validations
       if (!wallet || !/^0x[0-9a-fA-F]{40}$/.test(wallet)) {
         return res.status(400).json({ success: false, error: 'Invalid wallet address format.' });
-      }
-
-      if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) {
-        return res.status(400).json({ success: false, error: 'Invalid wallet address field format.' });
       }
 
       if (transactionHash && !/^0x[0-9a-fA-F]{64}$/.test(transactionHash)) {

@@ -83,7 +83,8 @@ class EventListener {
             prosAmount: prosAmount.toString(),
             paymentRail,
             country,
-            timestamp: Math.floor(Date.now() / 1000)
+            timestamp: Math.floor(Date.now() / 1000),
+            pharosLockTx: log.transactionHash
           };
 
           await this.settlementEngine.handlePaymentInitiated(eventData);

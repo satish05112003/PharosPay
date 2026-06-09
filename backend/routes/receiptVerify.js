@@ -18,9 +18,12 @@ module.exports = (db) => {
     try {
       // 1. Rate Limiting (20 requests per IP per minute)
       const rateLimitKey = `support:ratelimit:verify:${ip}`;
-      const currentLimit = await redis.incr(rateLimitKey);
-      if (currentLimit === 1) {
-        await redis.expire(rateLimitKey, 60); // 1 minute
+      let currentLimit = 0;
+      if (redis.status === 'ready') {
+        currentLimit = await redis.incr(rateLimitKey);
+        if (currentLimit === 1) {
+          await redis.expire(rateLimitKey, 60); // 1 minute
+        }
       }
       if (currentLimit > 20) {
         return res.status(429).json({
@@ -55,7 +58,10 @@ module.exports = (db) => {
       }
 
       // Add dynamic view count from Redis
-      const viewCount = await redis.get(`support:receipt:${result.receipt.payment.paymentId}:views`) || 0;
+      let viewCount = 0;
+      if (redis.status === 'ready') {
+        viewCount = await redis.get(`support:receipt:${result.receipt.payment.paymentId}:views`) || 0;
+      }
       result.receipt.meta.viewCount = parseInt(viewCount);
 
       res.json({
@@ -80,7 +86,10 @@ module.exports = (db) => {
       const receipt = await receiptGenerator.generateJsonReceipt(paymentId);
       
       // Increment view count in Redis
-      const viewCount = await redis.incr(`support:receipt:${paymentId}:views`);
+      let viewCount = 0;
+      if (redis.status === 'ready') {
+        viewCount = await redis.incr(`support:receipt:${paymentId}:views`);
+      }
       receipt.viewCount = viewCount;
 
       res.json({

@@ -39,7 +39,13 @@ class Payment {
     prosPriceAtExecution = null,
     fxRateAtExecution = null,
     quoteTimestamp = null,
-    priceSource = null
+    priceSource = null,
+    prosAmountExecuted = null,
+    usdAmountAtExecution = null,
+    usdInrRate = null,
+    prosUsdPrice = null,
+    feePercent = 2.00,
+    timestamp = null
   }) {
     const res = await this.db.query(
       `INSERT INTO payments (
@@ -47,15 +53,19 @@ class Payment {
         country, payment_rail, fiat_amount, fiat_currency, pros_amount,
         pros_usd_rate, usd_fiat_rate, pharos_lock_tx, pharos_confirm_tx,
         status, idempotency_key, metadata,
-        pros_price_at_execution, fx_rate_at_execution, quote_timestamp, price_source
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        pros_price_at_execution, fx_rate_at_execution, quote_timestamp, price_source,
+        pros_amount_executed, usd_amount_at_execution,
+        usd_inr_rate, pros_usd_price, fee_percent, timestamp
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING *`,
       [
         pharosPaymentId, userWallet, merchantId, merchantIdentifier,
         country, paymentRail, fiatAmount, fiatCurrency, prosAmount,
         prosUsdRate, usdFiatRate, pharosLockTx, pharosConfirmTx,
         status, idempotencyKey, JSON.stringify(metadata),
-        prosPriceAtExecution, fxRateAtExecution, quoteTimestamp, priceSource
+        prosPriceAtExecution, fxRateAtExecution, quoteTimestamp, priceSource,
+        prosAmountExecuted || prosAmount, usdAmountAtExecution,
+        usdInrRate, prosUsdPrice, feePercent, timestamp || new Date()
       ]
     );
     return res.rows[0];

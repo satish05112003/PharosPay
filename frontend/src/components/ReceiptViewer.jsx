@@ -51,17 +51,19 @@ export default function ReceiptViewer({ payment, onClose }) {
     const text = [
       `PharosPay Receipt`,
       `=================`,
-      `Payment ID: ${receipt.pharosPaymentId || receipt.paymentId}`,
+      `Payment ID: ${receipt.referenceNumber || receipt.paymentId}`,
       `Merchant: ${receipt.merchant?.name || 'N/A'}`,
       `Amount: ${receipt.paymentDetails?.fiatAmount} ${receipt.paymentDetails?.fiatCurrency}`,
       `PROS Paid: ${Number(receipt.paymentDetails?.prosAmount || 0).toFixed(4)} PROS`,
       `Status: ${receipt.paymentDetails?.status || 'SETTLED'}`,
-      `PROS Price: $${Number(receipt.paymentDetails?.prosPriceAtExecution || 0).toFixed(4)}`,
-      `FX Rate: ${Number(receipt.paymentDetails?.fxRateAtExecution || 0).toFixed(4)}`,
-      `UTR: ${receipt.utr || 'N/A'}`,
+      `PROS Price: ${receipt.paymentDetails?.prosPriceAtExecution ? '$' + Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4) : 'Execution data unavailable'}`,
+      `FX Rate: ${receipt.paymentDetails?.fxRateAtExecution ? Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4) : 'Execution data unavailable'}`,
+      receipt.utr ? `${receipt.utrLabel || 'Bank UTR'}: ${receipt.utr}` : null,
       `Date: ${receipt.paymentDetails?.timestamp ? new Date(receipt.paymentDetails.timestamp).toLocaleString() : 'N/A'}`,
       `Source: ${receipt.paymentDetails?.priceSource || 'Coinbase'}`,
-    ].join('\n');
+      receipt.blockchain?.txHash ? `Transaction Hash: ${receipt.blockchain.txHash}` : null,
+      receipt.blockchain?.txHash ? `Explorer Link: https://atlantic.pharosscan.xyz/tx/${receipt.blockchain.txHash}` : null,
+    ].filter(Boolean).join('\n');
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -124,7 +126,7 @@ export default function ReceiptViewer({ payment, onClose }) {
           <div class="card">
             <h3>3. Settlement Information</h3>
             <div class="row"><span>Payout Bank</span><span>${receipt.merchant?.bank || 'N/A'}</span></div>
-            <div class="row"><span>UTR Number</span><span>${receipt.utr || 'N/A'}</span></div>
+            <div class="row"><span>${receipt.utrLabel || 'Bank UTR'}</span><span>${receipt.utr || 'N/A'}</span></div>
             <div class="row"><span>Speed</span><span>Instant Settlement (⚡ Speed)</span></div>
           </div>
 
@@ -132,14 +134,17 @@ export default function ReceiptViewer({ payment, onClose }) {
             <h3>4. Financial Breakdown</h3>
             <div class="row"><span>Base Fiat Amount</span><span>${Number(receipt.paymentDetails.fiatAmount).toFixed(2)} ${receipt.paymentDetails.fiatCurrency}</span></div>
             <div class="row"><span>Platform Fee (2.0%)</span><span>${(Number(receipt.paymentDetails.fiatAmount) * 0.02).toFixed(2)} ${receipt.paymentDetails.fiatCurrency}</span></div>
-            <div class="row"><span>PROS/USD Price</span><span>$${Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4)}</span></div>
-            <div class="row"><span>Exchange Rate (USD/${receipt.paymentDetails.fiatCurrency})</span><span>${Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4)}</span></div>
+            <div class="row"><span>PROS/USD Price</span><span>${receipt.paymentDetails.prosPriceAtExecution ? '$' + Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4) : 'Execution data unavailable'}</span></div>
+            <div class="row"><span>Exchange Rate (USD/${receipt.paymentDetails.fiatCurrency})</span><span>${receipt.paymentDetails.fxRateAtExecution ? Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4) : 'Execution data unavailable'}</span></div>
           </div>
 
           <div class="card">
             <h3>5. Blockchain Verification</h3>
-            <div class="row"><span>Payment ID</span><span class="mono">${receipt.pharosPaymentId}</span></div>
-            <div class="row"><span>Confirm TX Hash</span><span class="mono">${receipt.blockchain?.confirmTxHash || 'N/A'}</span></div>
+            <div class="row"><span>Payment ID</span><span class="mono">${receipt.referenceNumber || receipt.paymentId}</span></div>
+            ${receipt.blockchain?.txHash ? `
+              <div class="row"><span>Transaction Hash</span><span class="mono">${receipt.blockchain.txHash}</span></div>
+              <div class="row"><span>Explorer</span><span class="mono"><a href="https://atlantic.pharosscan.xyz/tx/${receipt.blockchain.txHash}" target="_blank" style="color:#6366f1;text-decoration:none">https://atlantic.pharosscan.xyz/tx/${receipt.blockchain.txHash}</a></span></div>
+            ` : ''}
           </div>
 
           <div class="card">
@@ -304,10 +309,11 @@ export default function ReceiptViewer({ payment, onClose }) {
                 </div>
                 {[
                   { label: 'Payout Bank', value: receipt.merchant?.bank || 'N/A' },
-                  { label: 'Bank reference UTR', value: receipt.utr || 'N/A', mono: true },
+                  { label: receipt.utrLabel || 'Bank UTR', value: receipt.utr || 'N/A', mono: true },
                   { label: 'Base Fiat Amount', value: `${Number(receipt.paymentDetails.fiatAmount).toFixed(2)} ${receipt.paymentDetails.fiatCurrency}` },
                   { label: 'Platform Fee (2.0%)', value: `${(Number(receipt.paymentDetails.fiatAmount) * 0.02).toFixed(2)} ${receipt.paymentDetails.fiatCurrency}` },
-                  { label: 'Exchange Rate', value: `${Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4)} (USD/${receipt.paymentDetails.fiatCurrency})` },
+                  { label: 'PROS/USD Price', value: receipt.paymentDetails.prosPriceAtExecution ? `$${Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4)}` : 'Execution data unavailable' },
+                  { label: 'Exchange Rate', value: receipt.paymentDetails.fxRateAtExecution ? `${Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4)} (USD/${receipt.paymentDetails.fiatCurrency})` : 'Execution data unavailable' },
                   { label: 'Oracle Source', value: receipt.paymentDetails.priceSource || 'Coinbase' },
                   { label: 'Date Issued', value: new Date(receipt.paymentDetails.timestamp).toLocaleString() },
                 ].map((row, i) => (
@@ -326,12 +332,24 @@ export default function ReceiptViewer({ payment, onClose }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
                   <div>
                     <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Payment ID</span>
-                    <span style={{ fontFamily: 'monospace', color: 'var(--text)', fontWeight: 700, wordBreak: 'break-all' }}>{receipt.pharosPaymentId}</span>
+                    <span style={{ fontFamily: 'monospace', color: 'var(--text)', fontWeight: 700, wordBreak: 'break-all' }}>{receipt.referenceNumber || receipt.paymentId}</span>
                   </div>
-                  <div>
-                    <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Confirm TX Hash</span>
-                    <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700, wordBreak: 'break-all' }}>{receipt.blockchain?.confirmTxHash || 'N/A'}</span>
-                  </div>
+                  {receipt.blockchain?.txHash && (
+                    <>
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Transaction Hash</span>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700, wordBreak: 'break-all' }}>{receipt.blockchain.txHash}</span>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '2px' }}>Explorer</span>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700, wordBreak: 'break-all' }}>
+                          <a href={`https://atlantic.pharosscan.xyz/tx/${receipt.blockchain.txHash}`} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                            https://atlantic.pharosscan.xyz/tx/{receipt.blockchain.txHash}
+                          </a>
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

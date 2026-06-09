@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../config';
+import ReceiptViewer from '../components/ReceiptViewer';
 
 export default function VerifyReceipt() {
   const navigate = useNavigate();
@@ -184,94 +185,10 @@ export default function VerifyReceipt() {
         )}
 
         {status === 'verified' && result && (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {/* SVG Checkmark */}
-            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" style={{ marginBottom: '12px', animation: 'scaleUp 0.3s ease' }}>
-              <circle cx="12" cy="12" r="10" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" strokeWidth="2"/>
-              <path d="M8 12l3 3 5-5" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: '#10b981' }}>✓ VERIFIED RECEIPT</h3>
-            <p style={{ textAlign: 'center', margin: '0 0 20px 0', fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', lineHeight: '1.4' }}>
-              {result.antiTamperMessage}
-            </p>
-
-            <div 
-              style={{
-                width: '100%',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: '12px',
-                padding: '16px',
-                fontSize: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                marginBottom: '24px'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Receipt ID</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{result.receiptSummary.settlement.referenceNumber || result.receiptSummary.payment.paymentId.substring(0, 15)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Status</span>
-                <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, fontSize: '10px' }}>
-                  {result.paymentDetails.paymentDetails.status}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Amount Settled</span>
-                <strong style={{ fontSize: '14px', color: 'var(--text)' }}>
-                  {result.paymentDetails.paymentDetails.fiatCurrency} {Number(result.paymentDetails.paymentDetails.fiatAmount).toFixed(2)}
-                </strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Merchant</span>
-                <span style={{ textAlign: 'right' }}>
-                  <div>{result.paymentDetails.merchant.name}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{result.paymentDetails.paymentDetails.paymentRail} • {result.paymentDetails.paymentDetails.country}</div>
-                </span>
-              </div>
-              {result.receiptSummary.settlement.utr && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>UTR Number</span>
-                  <span style={{ fontFamily: 'monospace' }}>{result.receiptSummary.settlement.utr}</span>
-                </div>
-              )}
-              {result.paymentDetails.blockchain.confirmTxHash && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>On-Chain Hash</span>
-                  <span style={{ fontFamily: 'monospace', color: 'var(--primary, #6366f1)' }}>
-                    {result.paymentDetails.blockchain.confirmTxHash.substring(0, 10)}...{result.paymentDetails.blockchain.confirmTxHash.slice(-8)}
-                  </span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Settled At</span>
-                <span>{new Date(result.paymentDetails.paymentDetails.timestamp).toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', fontSize: '10px', color: 'var(--text-secondary)' }}>
-                <span>Views: {result.receiptSummary.meta.viewCount || 1}</span>
-                <span>Security signature matches</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-              <button 
-                onClick={handleDownloadPDF}
-                style={{ flex: 1, background: 'var(--primary, #6366f1)', border: 'none', borderRadius: '10px', padding: '10px', color: '#ffffff', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
-              >
-                Download PDF
-              </button>
-              <button 
-                onClick={() => setStatus('idle')}
-                style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
-              >
-                Verify Another
-              </button>
-            </div>
-          </div>
+          <ReceiptViewer
+            payment={{ id: result.paymentDetails.paymentId || result.paymentDetails.id }}
+            onClose={() => setStatus('idle')}
+          />
         )}
 
         {status === 'tampered' && (

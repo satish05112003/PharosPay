@@ -30,7 +30,8 @@ module.exports = (settlementEngine, db) => {
         prosAmount: prosAmount ? ethers.parseEther(prosAmount.toString()).toString() : '0',
         paymentRail,
         country: country || 'US',
-        timestamp: Math.floor(Date.now() / 1000)
+        timestamp: Math.floor(Date.now() / 1000),
+        pharosLockTx: txHash || null
       });
 
       // Get the payment record that was created
@@ -40,6 +41,9 @@ module.exports = (settlementEngine, db) => {
       res.json({
         success: true,
         settlement: {
+          id: payment ? payment.id : null,
+          paymentId: payment ? payment.id : null,
+          pharosPaymentId: paymentId,
           settlementId: settlement ? settlement.id : 'simulated_ref',
           status: payment ? payment.status : 'SETTLEMENT_STARTED',
           message: 'Settlement initiated successfully',
@@ -77,14 +81,6 @@ module.exports = (settlementEngine, db) => {
       query += ` ORDER BY p.created_at DESC`;
       
       const result = await db.query(query, params);
-
-      let liveProsPrice = 0.6360;
-      try {
-        const priceService = require('../services/PriceService');
-        liveProsPrice = await priceService.getProsUsdPrice();
-      } catch (err) {
-        console.warn('SettleRouter: Failed to fetch live price for fallback history mapping:', err.message);
-      }
       
       const history = result.rows.map(s => ({
         id: s.pharos_payment_id || s.id,
@@ -94,7 +90,9 @@ module.exports = (settlementEngine, db) => {
         merchantName: s.metadata?.merchantName || s.merchant_identifier,
         fiatCurrency: s.fiat_currency,
         fiatAmount: Number(s.fiat_amount),
-        prosAmount: s.pros_amount,
+        prosAmount: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
+        prosAmountExecuted: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
+        usdAmountAtExecution: s.usd_amount_at_execution ? Number(s.usd_amount_at_execution) : null,
         feeAmount: s.metadata?.feeAmount || '0.0000',
         paymentRail: s.payment_rail,
         country: s.country,
@@ -102,8 +100,8 @@ module.exports = (settlementEngine, db) => {
         status: s.status,
         utr: s.utr,
         referenceNumber: s.reference_number,
-        prosPriceAtExecution: s.pros_price_at_execution || s.pros_usd_rate || liveProsPrice,
-        fxRateAtExecution: s.fx_rate_at_execution || s.usd_fiat_rate || 1.0,
+        prosPriceAtExecution: s.pros_price_at_execution ? Number(s.pros_price_at_execution) : (s.pros_usd_rate ? Number(s.pros_usd_rate) : null),
+        fxRateAtExecution: s.fx_rate_at_execution ? Number(s.fx_rate_at_execution) : (s.usd_fiat_rate ? Number(s.usd_fiat_rate) : null),
         quoteTimestamp: s.quote_timestamp || s.created_at,
         priceSource: s.price_source || 'Coinbase'
       }));

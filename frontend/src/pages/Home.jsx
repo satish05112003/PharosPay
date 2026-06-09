@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { usePayments } from '../context/PaymentContext';
 import { CURRENCIES, API_BASE } from '../config';
 import { Ic } from '../components/Icons';
+import ReceiptViewer from '../components/ReceiptViewer';
 
 export default function Home({ wallet }) {
   const navigate = useNavigate();
   const { payments, loading: loadingTx, error, globalStats, userPaymentCount, refreshPayments } = usePayments();
+  const [receiptPayment, setReceiptPayment] = useState(null);
 
   // Smart Greeting logic helpers
   const getGreeting = () => {
@@ -118,7 +120,7 @@ export default function Home({ wallet }) {
       if (pDate >= oneWeekAgo) {
         const dayName = days[pDate.getDay()];
         const amt = parseFloat(p.prosAmount) || 0;
-        const rate = parseFloat(p.prosPriceAtExecution) || prosPrice;
+        const rate = parseFloat(p.prosPriceAtExecution) || 0;
         if (dayVolumes[dayName] !== undefined) {
           dayVolumes[dayName] += amt;
           dayUsd[dayName] += amt * rate;
@@ -230,8 +232,8 @@ export default function Home({ wallet }) {
   const recentTx = payments.slice(0, 5); // latest 5 transactions
 
   const userVolPROS = payments.reduce((acc, p) => acc + (parseFloat(p.prosAmount) || 0), 0);
-  const userVolUSD = payments.reduce((acc, p) => acc + ((parseFloat(p.prosAmount) || 0) * (parseFloat(p.prosPriceAtExecution) || prosPrice)), 0);
-  const userFeesUSD = payments.reduce((acc, p) => acc + ((parseFloat(p.feeAmount) || 0) * (parseFloat(p.prosPriceAtExecution) || prosPrice)), 0);
+  const userVolUSD = payments.reduce((acc, p) => acc + ((parseFloat(p.prosAmount) || 0) * (parseFloat(p.prosPriceAtExecution) || 0)), 0);
+  const userFeesUSD = payments.reduce((acc, p) => acc + ((parseFloat(p.feeAmount) || 0) * (parseFloat(p.prosPriceAtExecution) || 0)), 0);
 
   const statsItems = [
     { label: "Total Payments", value: wallet.isConnected ? userPaymentCount.toString() : "0", sub: `${globalStats.paymentCount} globally`, icon: "send", color: "#2563eb" },
@@ -620,7 +622,7 @@ export default function Home({ wallet }) {
                       <td>
                         <button 
                           className="btn btn-secondary btn-sm" 
-                          onClick={() => handlePrintReceipt(tx)} 
+                          onClick={() => setReceiptPayment(tx)} 
                           style={{ padding: "6px 12px", borderRadius: "6px" }}
                         >
                           Receipt
@@ -692,6 +694,13 @@ export default function Home({ wallet }) {
             </div>
           )}
         </div>
+      )}
+      {/* Receipt Viewer Modal */}
+      {receiptPayment && (
+        <ReceiptViewer
+          payment={receiptPayment}
+          onClose={() => setReceiptPayment(null)}
+        />
       )}
     </div>
   );

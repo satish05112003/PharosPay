@@ -1,108 +1,126 @@
 import React from 'react';
-import { parseIsoDate } from '../../utils/contextUtils';
+import './support.css';
+
+function timeAgo(date) {
+  if (!date) return '';
+  const now = new Date();
+  const diff = Math.floor((now - new Date(date)) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(date).toLocaleDateString();
+}
+
+function getSessionTitle(sess) {
+  // Try to derive a human title from lastMessage or sessionId
+  if (sess.title) return sess.title;
+  if (sess.lastMessage) {
+    const trimmed = sess.lastMessage.trim();
+    if (trimmed && trimmed !== '[New Support Session Initiated]') {
+      return trimmed.length > 30 ? trimmed.slice(0, 30) + '…' : trimmed;
+    }
+  }
+  return 'Support Session';
+}
+
+function getSessionPreview(sess) {
+  if (sess.lastMessage) {
+    const t = sess.lastMessage.trim();
+    if (t && t !== '[New Support Session Initiated]') {
+      return t.length > 45 ? t.slice(0, 45) + '…' : t;
+    }
+  }
+  if (sess.lastAiMessage) {
+    const t = sess.lastAiMessage.trim();
+    return t.length > 45 ? t.slice(0, 45) + '…' : t;
+  }
+  if (sess.messageCount > 0) {
+    return 'Loading preview...';
+  }
+  return 'No messages yet';
+}
 
 export default function SessionSidebar({ sessions, activeSessionId, onSelectSession, onNewSession, loading }) {
   return (
-    <div 
-      className="session-sidebar" 
-      style={{
-        width: '260px',
-        borderRight: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        background: 'rgba(255, 255, 255, 0.01)'
-      }}
-    >
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--border, rgba(255, 255, 255, 0.1))' }}>
-        <button
-          onClick={onNewSession}
-          style={{
-            width: '100%',
-            background: 'var(--primary, #6366f1)',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '10px',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '13px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}
-        >
-          <span>💬</span> New Chat Session
+    <div className="support-session-sidebar support-scroll">
+      {/* Header: New Chat button */}
+      <div style={{ padding: '14px 14px 10px' }}>
+        <button className="sidebar-new-chat-btn" onClick={onNewSession}>
+          <span style={{ fontSize: '16px' }}>✦</span> New Conversation
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-        <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Recent Sessions
-        </h4>
+      {/* Session List */}
+      <div className="support-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 10px 14px' }}>
+        <p className="sidebar-section-label" style={{ marginBottom: '10px', marginTop: '4px' }}>
+          Conversations
+        </p>
 
-        {loading && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '12px' }}>Loading...</div>}
-
-        {!loading && sessions.length === 0 && (
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '12px', textAlign: 'center' }}>
-            No past chat sessions
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} className="skeleton" style={{ height: '68px', borderRadius: '10px' }} />
+            ))}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {sessions.map((sess) => {
-            const isActive = sess.sessionId === activeSessionId;
-            return (
-              <button
-                key={sess.sessionId}
-                onClick={() => onSelectSession(sess.sessionId)}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  background: isActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                  border: isActive ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.background = 'transparent';
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span style={{ fontSize: '12px', color: isActive ? 'var(--primary, #6366f1)' : 'var(--text, #ffffff)', fontWeight: isActive ? 600 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
-                    {sess.sessionId.substring(0, 15)}...
-                  </span>
-                  <span 
-                    style={{
-                      fontSize: '9px',
-                      background: sess.status === 'HANDOFF' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                      color: sess.status === 'HANDOFF' ? '#10b981' : 'var(--text-secondary, #94a3b8)',
-                      padding: '1px 4px',
-                      borderRadius: '4px',
-                      fontWeight: 600
-                    }}
-                  >
-                    {sess.status}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary, #94a3b8)' }}>
-                  <span>{sess.messageCount} msgs</span>
-                  <span>{parseIsoDate(sess.lastMessageAt).split(',')[0]}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {!loading && sessions.length === 0 && (
+          <div className="sidebar-empty">
+            <div className="sidebar-empty-icon">💬</div>
+            <div className="sidebar-empty-title">No conversations yet</div>
+            <div className="sidebar-empty-desc">
+              Start a new chat to get support with payments, receipts, settlements, and the Pharos ecosystem.
+            </div>
+          </div>
+        )}
+
+        {!loading && sessions.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {sessions.map((sess) => {
+              const isActive = sess.sessionId === activeSessionId;
+              const title = getSessionTitle(sess);
+              const preview = getSessionPreview(sess);
+              const ago = timeAgo(sess.lastMessageAt || sess.createdAt);
+              const count = sess.messageCount || 0;
+              const isHandoff = sess.status === 'HANDOFF';
+
+              return (
+                <button
+                  key={sess.sessionId}
+                  onClick={() => onSelectSession(sess.sessionId)}
+                  className={`session-item ${isActive ? 'active' : ''}`}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span className="session-item-title">{title}</span>
+                    {isHandoff && (
+                      <span
+                        className="session-item-badge"
+                        style={{
+                          background: 'rgba(34, 197, 94, 0.12)',
+                          color: '#22c55e',
+                          fontSize: '8px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  <div className="session-item-preview">{preview}</div>
+                  <div className="session-item-meta">
+                    <span>{ago}</span>
+                    {count > 0 && (
+                      <span style={{ color: isActive ? 'var(--primary)' : 'var(--text-tertiary)' }}>
+                        {count} msg{count !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

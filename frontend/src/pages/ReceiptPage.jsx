@@ -50,14 +50,15 @@ export default function ReceiptPage() {
     const text = [
       `PharosPay Verified Receipt`,
       `=========================`,
-      `Receipt ID: ${summary.settlement.referenceNumber || summary.payment.paymentId}`,
+      `Payment ID: ${summary.settlement.referenceNumber || summary.payment.paymentId}`,
       `Amount: ${receipt.paymentDetails.paymentDetails.fiatCurrency} ${Number(receipt.paymentDetails.paymentDetails.fiatAmount).toFixed(2)}`,
       `Merchant: ${receipt.paymentDetails.merchant.name}`,
       `Status: ${receipt.paymentDetails.paymentDetails.status}`,
-      `UTR: ${summary.settlement.utr || 'N/A'}`,
-      `Tx Hash: ${receipt.paymentDetails.blockchain.confirmTxHash || 'N/A'}`,
+      summary.settlement.utr ? `${receipt.paymentDetails.utrLabel || 'Bank UTR'}: ${summary.settlement.utr}` : null,
+      receipt.paymentDetails.blockchain?.txHash ? `Transaction Hash: ${receipt.paymentDetails.blockchain.txHash}` : null,
+      receipt.paymentDetails.blockchain?.txHash ? `Explorer Link: https://atlantic.pharosscan.xyz/tx/${receipt.paymentDetails.blockchain.txHash}` : null,
       `Date: ${new Date(receipt.paymentDetails.paymentDetails.timestamp).toLocaleString()}`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -153,7 +154,7 @@ export default function ReceiptPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Receipt ID</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Payment ID</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
                   {receipt.receiptSummary.settlement.referenceNumber || receipt.receiptSummary.payment.paymentId}
                 </span>
@@ -181,22 +182,30 @@ export default function ReceiptPage() {
               </div>
               {receipt.receiptSummary.settlement.utr && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>UTR Number</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{receipt.paymentDetails.utrLabel || 'Bank UTR'}</span>
                   <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{receipt.receiptSummary.settlement.utr}</span>
                 </div>
               )}
-              {receipt.paymentDetails.blockchain.confirmTxHash && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>On-Chain Confirm TX</span>
-                  <a 
-                    href={`https://atlantic.pharosscan.xyz/tx/${receipt.paymentDetails.blockchain.confirmTxHash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontFamily: 'monospace', color: 'var(--primary, #6366f1)', textDecoration: 'none', fontWeight: 700 }}
-                  >
-                    {receipt.paymentDetails.blockchain.confirmTxHash.substring(0, 8)}...{receipt.paymentDetails.blockchain.confirmTxHash.slice(-6)}
-                  </a>
-                </div>
+              {receipt.paymentDetails.blockchain?.txHash && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Transaction Hash</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text)' }}>
+                      {receipt.paymentDetails.blockchain.txHash.substring(0, 10)}...{receipt.paymentDetails.blockchain.txHash.slice(-8)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Explorer</span>
+                    <a 
+                      href={`https://atlantic.pharosscan.xyz/tx/${receipt.paymentDetails.blockchain.txHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontFamily: 'monospace', color: 'var(--primary, #6366f1)', textDecoration: 'none', fontWeight: 700 }}
+                    >
+                      https://atlantic.pharosscan.xyz/tx/{receipt.paymentDetails.blockchain.txHash.substring(0, 8)}...
+                    </a>
+                  </div>
+                </>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '6px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Settled Timestamp</span>

@@ -30,22 +30,50 @@ class ReceiptGenerator {
     const settlement = await this.db.settlements.findByPaymentId(payment.id);
     const beneficiary = payment.merchant_id ? await this.db.beneficiaries.findById(payment.merchant_id) : null;
 
-    // Resolve dynamic pricing parameters if missing on older records
-    let liveProsPrice = 0.6360;
-    let liveFxRate = 1.0;
-    try {
-      liveProsPrice = await priceService.getProsUsdPrice();
-      liveFxRate = await priceService.getRateValue(payment.fiat_currency);
-    } catch (err) {
-      console.warn('ReceiptGenerator: Failed to fetch live prices for fallback mapping:', err.message);
+    const prosPrice = payment.pros_usd_price ? Number(payment.pros_usd_price) : (payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : (payment.pros_usd_rate ? Number(payment.pros_usd_rate) : null));
+    const fxRate = payment.usd_inr_rate ? Number(payment.usd_inr_rate) : (payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : (payment.usd_fiat_rate ? Number(payment.usd_fiat_rate) : null));
+
+    if (prosPrice && fxRate) {
+      const expectedPros = (Number(payment.fiat_amount) / fxRate / prosPrice) * 1.02;
+      const storedProsAmount = Number(payment.pros_amount_executed || payment.pros_amount);
+      const difference = Math.abs(expectedPros - storedProsAmount);
+      const differencePercent = (difference / expectedPros) * 100;
+      if (differencePercent > 1) {
+        console.error(`PAYMENT CALCULATION MISMATCH for payment ${payment.id}. Expected: ${expectedPros.toFixed(6)}, Stored: ${storedProsAmount.toFixed(6)} (Diff: ${differencePercent.toFixed(2)}%)`);
+      }
     }
+
+    const lockTxHash = payment.pharos_lock_tx;
+    const confirmTxHash = payment.pharos_confirm_tx;
+
+    let salvagedUtr = null;
+    if (confirmTxHash && typeof confirmTxHash === 'string' && (confirmTxHash.startsWith('UPI') || confirmTxHash.startsWith('SIM'))) {
+      salvagedUtr = confirmTxHash;
+    }
+
+    const isValidHash = (h) => typeof h === 'string' && /^0x[0-9a-fA-F]{64}$/.test(h);
+    const validLockTxHash = isValidHash(lockTxHash) ? lockTxHash : null;
+    const validConfirmTxHash = isValidHash(confirmTxHash) ? confirmTxHash : null;
+
+    let utr = settlement ? settlement.utr : (salvagedUtr || null);
+    if (utr && typeof utr === 'string') {
+      const isSimulated = utr.startsWith('SIM') || utr.startsWith('UPI');
+      if (isSimulated) {
+        const digits = utr.replace(/[^0-9]/g, '');
+        utr = `SIM-UPI-${digits}`;
+      }
+    }
+
+    const isSimulation = (settlement && (settlement.is_simulation || (utr && utr.startsWith('SIM-')))) || (utr && utr.startsWith('SIM-')) || false;
+    const utrLabel = isSimulation ? 'Settlement Reference' : 'Bank UTR';
 
     return {
       receiptId: payment.id,
       paymentId: payment.id,
       pharosPaymentId: payment.pharos_payment_id,
       referenceNumber: settlement ? settlement.reference_number : null,
-      utr: settlement ? settlement.utr : null,
+      utr,
+      utrLabel,
       payer: payment.user_wallet,
       merchant: {
         id: payment.merchant_identifier,
@@ -55,19 +83,22 @@ class ReceiptGenerator {
       paymentDetails: {
         fiatAmount: Number(payment.fiat_amount),
         fiatCurrency: payment.fiat_currency,
-        prosAmount: Number(payment.pros_amount),
+        prosAmount: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
+        prosAmountExecuted: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
+        usdAmountAtExecution: payment.usd_amount_at_execution ? Number(payment.usd_amount_at_execution) : null,
         paymentRail: payment.payment_rail,
         country: payment.country,
         status: payment.status,
         timestamp: payment.created_at,
-        prosPriceAtExecution: payment.pros_price_at_execution || payment.pros_usd_rate || liveProsPrice,
-        fxRateAtExecution: payment.fx_rate_at_execution || payment.usd_fiat_rate || liveFxRate,
+        prosPriceAtExecution: prosPrice,
+        fxRateAtExecution: fxRate,
         quoteTimestamp: payment.quote_timestamp || payment.created_at,
         priceSource: payment.price_source || 'Coinbase'
       },
       blockchain: {
-        lockTxHash: payment.pharos_lock_tx,
-        confirmTxHash: payment.pharos_confirm_tx
+        lockTxHash: validLockTxHash,
+        confirmTxHash: validConfirmTxHash,
+        txHash: validLockTxHash || validConfirmTxHash
       },
       settlementInfo: settlement ? {
         providerName: settlement.provider_name,
@@ -152,7 +183,7 @@ class ReceiptGenerator {
     // ─── 3. Settlement Information ───────────────────────────────
     drawSectionHeader('3. Settlement Information');
     drawRow('Payout Bank Destination', receiptData.merchant.bank || 'N/A');
-    drawRow('Banking Reference UTR', receiptData.utr || 'N/A');
+    drawRow(receiptData.utrLabel || 'Bank UTR', receiptData.utr || 'N/A');
     drawRow('Settlement Speed', 'Instant Payout (⚡ Speed)');
     if (receiptData.settlementInfo) {
       drawRow('Settlement Provider', receiptData.settlementInfo.providerName);
@@ -171,11 +202,19 @@ class ReceiptGenerator {
     // ─── 5. Blockchain Verification ──────────────────────────────
     drawSectionHeader('5. Blockchain Verification');
     doc.fontSize(8.5).font('Helvetica-Bold').fillColor('#0f172a').text('Payment ID:', 45, doc.y, { continued: true });
-    doc.font('Courier').fillColor('#475569').text(`  ${receiptData.pharosPaymentId}`, { align: 'right' });
+    doc.font('Courier').fillColor('#475569').text(`  ${receiptData.referenceNumber || receiptData.paymentId}`, { align: 'right' });
     doc.moveDown(0.2);
-    doc.font('Helvetica-Bold').fillColor('#0f172a').text('Confirm TX Hash:', 45, doc.y, { continued: true });
-    doc.font('Courier').fillColor('#475569').text(`  ${receiptData.blockchain.confirmTxHash || 'N/A'}`, { align: 'right' });
-    doc.moveDown(0.2);
+    
+    const txHash = receiptData.blockchain ? receiptData.blockchain.txHash : null;
+    if (txHash) {
+      doc.font('Helvetica-Bold').fillColor('#0f172a').text('Transaction Hash:', 45, doc.y, { continued: true });
+      doc.font('Courier').fillColor('#475569').text(`  ${txHash}`, { align: 'right' });
+      doc.moveDown(0.2);
+
+      doc.font('Helvetica-Bold').fillColor('#0f172a').text('Explorer:', 45, doc.y, { continued: true });
+      doc.font('Courier').fillColor('#6366f1').text(`  https://atlantic.pharosscan.xyz/tx/${txHash}`, { align: 'right' });
+      doc.moveDown(0.2);
+    }
 
     // ─── 6. Support Information ──────────────────────────────────
     drawSectionHeader('6. Support Information');

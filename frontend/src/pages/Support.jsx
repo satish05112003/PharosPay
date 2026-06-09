@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE } from '../config';
 import { Ic } from '../components/Icons';
 
@@ -8,13 +8,13 @@ import useAIChat from '../hooks/useAIChat';
 import useEscalation from '../hooks/useEscalation';
 import useHandoff from '../hooks/useHandoff';
 import SessionSidebar from '../components/support/SessionSidebar';
-import AIMessageBubble from '../components/support/AIMessageBubble';
+import AIMessageBubble, { formatMessageText, renderMarkdownAndHashes } from '../components/support/AIMessageBubble';
 import ContextPreview from '../components/support/ContextPreview';
-import QuickReplyChips from '../components/support/QuickReplyChips';
 import PromptSuggestions from '../components/support/PromptSuggestions';
 import HumanHandoffBanner from '../components/support/HumanHandoffBanner';
 import TypingIndicator from '../components/support/TypingIndicator';
 import EscalationModal from '../components/support/EscalationModal';
+import '../components/support/support.css';
 
 const CATEGORIES = [
   { value: 'payment_failed', label: 'Payment Failed', icon: 'x', color: 'var(--danger)' },
@@ -99,6 +99,103 @@ export default function Support({ wallet }) {
   const [showDebug, setShowDebug] = useState(false);
   const [debugClickCount, setDebugClickCount] = useState(0);
   const [ticketTyping, setTicketTyping] = useState(false);
+
+  // Mobile sidebar drawer
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  // Client-side dynamic session details pre-fetching
+  const [sessionDetails, setSessionDetails] = useState({});
+  const fetchingSessionIds = useRef(new Set());
+
+  const generateClientSessionTitle = (firstUserMessageContent) => {
+    if (!firstUserMessageContent) return 'Support Session';
+    const text = firstUserMessageContent.toLowerCase();
+    
+    if (text.includes('payment') || text.includes('pay') || text.includes('failed') || text.includes('revert') || text.includes('debit') || text.includes('wrong') || text.includes('price') || text.includes('rate') || text.includes('pros') || text.includes('usd') || text.includes('inr')) {
+      return 'Wrong Payment Issue';
+    }
+    if (text.includes('settle') || text.includes('delay') || text.includes('payout') || text.includes('receive') || text.includes('bank') || text.includes('pending') || text.includes('routing') || text.includes('router')) {
+      return 'Settlement Delay';
+    }
+    if (text.includes('receipt') || text.includes('verify') || text.includes('proof') || text.includes('pdf') || text.includes('explorer') || text.includes('pharosscan')) {
+      return 'Receipt Verification';
+    }
+    if (text.includes('tx') || text.includes('hash') || text.includes('transaction') || text.includes('blockchain') || text.includes('oracle') || text.includes('support') || text.includes('atlantic') || text.includes('testnet') || text.includes('ca')) {
+      return 'Transaction Support';
+    }
+    return 'Support Session';
+  };
+
+  useEffect(() => {
+    if (!sessions || sessions.length === 0) return;
+    
+    sessions.forEach(async (sess) => {
+      if (sessionDetails[sess.sessionId] || fetchingSessionIds.current.has(sess.sessionId)) return;
+      
+      fetchingSessionIds.current.add(sess.sessionId);
+      try {
+        const res = await fetch(`${API_BASE}/support/session/${sess.sessionId}/messages`);
+        const data = await res.json();
+        if (data.success && data.messages) {
+          const validMsgs = data.messages.filter(m => m.content !== '[New Support Session Initiated]');
+          if (validMsgs.length > 0) {
+            const firstUser = validMsgs.find(m => m.senderType === 'user');
+            const lastMsg = validMsgs[validMsgs.length - 1];
+            
+            setSessionDetails(prev => ({
+              ...prev,
+              [sess.sessionId]: {
+                title: generateClientSessionTitle(firstUser?.content || lastMsg?.content),
+                lastMessage: lastMsg?.content || '',
+                lastAiMessage: validMsgs.filter(m => m.senderType === 'ai').pop()?.content || ''
+              }
+            }));
+          } else {
+            setSessionDetails(prev => ({
+              ...prev,
+              [sess.sessionId]: {
+                title: 'Support Session',
+                lastMessage: '',
+                lastAiMessage: ''
+              }
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to pre-fetch session details:', err);
+        fetchingSessionIds.current.delete(sess.sessionId);
+      }
+    });
+  }, [sessions, sessionDetails]);
+
+  const enrichedSessions = sessions.map(sess => {
+    const isActive = sess.sessionId === sessionId;
+    if (isActive && messages.length > 0) {
+      const validMsgs = messages.filter(m => m.content !== '[New Support Session Initiated]');
+      if (validMsgs.length > 0) {
+        const firstUser = validMsgs.find(m => m.senderType === 'user');
+        const lastMsg = validMsgs[validMsgs.length - 1];
+        return {
+          ...sess,
+          title: generateClientSessionTitle(firstUser?.content || lastMsg?.content),
+          lastMessage: lastMsg?.content || '',
+          lastAiMessage: validMsgs.filter(m => m.senderType === 'ai').pop()?.content || ''
+        };
+      }
+    }
+    
+    const details = sessionDetails[sess.sessionId];
+    if (details) {
+      return {
+        ...sess,
+        title: details.title,
+        lastMessage: details.lastMessage,
+        lastAiMessage: details.lastAiMessage
+      };
+    }
+    return sess;
+  });
+
   const handleTitleClick = () => {
     setDebugClickCount(prev => {
       const next = prev + 1;
@@ -122,14 +219,26 @@ export default function Support({ wallet }) {
     };
     fetchStatus();
   }, []);
-  const aiChatMessagesEndRef = useRef(null);
 
-  // Auto-scroll AI chat messages
-  useEffect(() => {
-    if (aiChatMessagesEndRef.current) {
-      aiChatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  const aiChatMessagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Auto-scroll AI chat messages robust implementation
+  const scrollToBottom = useCallback(() => {
+    const chatContainer = document.querySelector('.chat-messages-area');
+    if (chatContainer) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-  }, [messages, typing]);
+    if (aiChatMessagesEndRef.current) {
+      aiChatMessagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+    const timer = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timer);
+  }, [messages, typing, scrollToBottom, activeTab]);
 
   // Auto-open escalation modal if AI flags high/critical issue
   useEffect(() => {
@@ -144,20 +253,51 @@ export default function Support({ wallet }) {
     }
   }, [messages]);
 
-  // Handle Escalation Modal Submit
+  // Handle Escalation Modal Submit — forward ALL form fields including walletAddress + transactionHash
   const handleEscalateSubmit = async (formData) => {
     const lastAiMsg = [...messages].reverse().find(m => m.senderType === 'ai');
-    const severity = lastAiMsg?.metadata?.severity || 'MEDIUM';
+    const severity = formData.urgency?.toUpperCase() || lastAiMsg?.metadata?.severity || 'MEDIUM';
     const confidence = lastAiMsg?.metadata?.confidence || 0.85;
     const ticketId = lastAiMsg?.metadata?.ticketId || null;
 
     const res = await escalate({
       ...formData,
+      // Ensure these critical fields are explicitly forwarded
+      walletAddress: formData.walletAddress || wallet.address,
+      transactionHash: formData.transactionHash || null,
       severity,
       confidence,
       ticketId
     });
     return !!res;
+  };
+
+  // Auto-expand textarea
+  const autoExpand = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  }, []);
+
+  useEffect(() => { autoExpand(); }, [inputText, autoExpand]);
+
+  const handleSendAI = (e) => {
+    if (e) e.preventDefault();
+    const text = inputText.trim();
+    if (!text) return;
+    sendMessage(text);
+    setInputText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendAI();
+    }
   };
 
   const [tickets, setTickets] = useState([]);
@@ -188,8 +328,12 @@ export default function Support({ wallet }) {
 
   // Mobile detection
   const [isMob, setIsMob] = useState(window.innerWidth < 768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
   useEffect(() => {
-    const h = () => setIsMob(window.innerWidth < 768);
+    const h = () => {
+      setIsMob(window.innerWidth < 768);
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024);
+    };
     window.addEventListener('resize', h);
     return () => window.removeEventListener('resize', h);
   }, []);
@@ -201,12 +345,22 @@ export default function Support({ wallet }) {
     }
   }, [activeTab, wallet.isConnected, wallet.address]);
 
-  // Scroll messages to bottom
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  // Scroll messages to bottom robust implementation
+  const scrollTicketToBottom = useCallback(() => {
+    const ticketContainer = document.querySelector('.ticket-messages-container');
+    if (ticketContainer) {
+      ticketContainer.scrollTop = ticketContainer.scrollHeight;
     }
-  }, [ticketDetail?.messages, ticketTyping]);
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollTicketToBottom();
+    const timer = setTimeout(scrollTicketToBottom, 100);
+    return () => clearTimeout(timer);
+  }, [ticketDetail?.messages, ticketTyping, scrollTicketToBottom, activeTab]);
 
   // Auto-detect category preview
   const previewCategory = category || (subject || description
@@ -344,20 +498,35 @@ export default function Support({ wallet }) {
     statusFilter === 'all' || t.status === statusFilter
   );
 
+  const MAX_INPUT_LENGTH = 2000;
+  const charCount = inputText.length;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
+
   if (!wallet.isConnected) {
     return (
-      <div className="page-enter" style={{ padding: '40px 24px', textAlign: 'center', maxWidth: '480px', margin: '40px auto' }}>
-        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <Ic name="help" size={28} color="var(--primary)" />
+      <div className="page-enter" style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '480px', margin: '60px auto' }}>
+        <div style={{
+          width: '72px', height: '72px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px',
+          boxShadow: '0 4px 20px rgba(59,130,246,0.15)',
+        }}>
+          <Ic name="help" size={30} color="var(--primary)" />
         </div>
-        <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text)', margin: '0 0 8px 0' }}>Connect Wallet</h2>
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Connect your wallet to access support and create tickets.</p>
+        <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text)', margin: '0 0 8px 0' }}>Connect Your Wallet</h2>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+          Connect your wallet to access the AI support assistant, create tickets, and manage your account.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="page-enter" style={{ padding: '24px', maxWidth: '960px', margin: '0 auto' }}>
+    <div className="page-enter" style={{ padding: '24px', maxWidth: '1400px', width: '100%', margin: '0 auto', overflowX: 'hidden' }}>
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -398,6 +567,7 @@ export default function Support({ wallet }) {
               alignItems: 'center',
               gap: '6px',
               transition: 'var(--transition)',
+              fontFamily: 'inherit',
             }}
           >
             <Ic name={tab.icon} size={15} color={activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)'} />
@@ -414,195 +584,208 @@ export default function Support({ wallet }) {
         ))}
       </div>
 
-      {/* TAB: AI Chat */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          TAB: AI CHAT — Premium redesign
+         ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'ai_chat' && (
-        <div className="page-enter card" style={{ padding: 0, overflow: 'hidden', height: '600px', display: 'flex' }}>
-          {/* Session Sidebar */}
-          {!isMob && (
-            <SessionSidebar 
-              sessions={sessions} 
-              activeSessionId={sessionId} 
-              onSelectSession={switchSession} 
-              onNewSession={() => {
-                const newId = startNewSession();
-                sendMessage('[New Support Session Initiated]');
-              }} 
-              loading={loadingSessions} 
-            />
+        <>
+          {/* Mobile drawer */}
+          {isMob && mobileDrawerOpen && (
+            <>
+              <div className="mobile-drawer-overlay" onClick={() => setMobileDrawerOpen(false)} />
+              <div className="mobile-drawer">
+                <SessionSidebar 
+                  sessions={enrichedSessions} 
+                  activeSessionId={sessionId} 
+                  onSelectSession={(id) => { switchSession(id); setMobileDrawerOpen(false); }} 
+                  onNewSession={() => {
+                    startNewSession();
+                    sendMessage('[New Support Session Initiated]');
+                    setMobileDrawerOpen(false);
+                  }} 
+                  loading={loadingSessions} 
+                />
+              </div>
+            </>
           )}
 
-          {/* Chat Pane */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Handoff Status Header */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.01)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <strong style={{ fontSize: '13px' }}>Pharos Support Assistant</strong>
-                </div>
-                {showDebug && (
-                  <>
-                    <span style={{ borderLeft: '1px solid var(--border)', height: '14px' }}></span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
-                      <span style={{ color: aiStatus.enabled ? '#10b981' : '#ef4444' }}>●</span>
-                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
-                        {aiStatus.enabled ? `Connected (${aiStatus.provider === 'grok' ? 'Grok' : 'OpenRouter'})` : 'Disconnected'}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {handoffStatus === 'AI_ONLY' ? (
-                  <button
-                    onClick={() => setEscalationOpen(true)}
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.25)',
-                      borderRadius: '6px',
-                      padding: '4px 10px',
-                      color: '#ef4444',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Escalate to Human
-                  </button>
-                ) : (
-                  <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>Live Handoff Active</span>
-                )}
-              </div>
-            </div>
+          <div className="support-chat-shell" style={{ overflowX: 'hidden' }}>
+            {/* Desktop / Tablet Session Sidebar */}
+            {!isMob && (
+              <SessionSidebar 
+                sessions={enrichedSessions} 
+                activeSessionId={sessionId} 
+                onSelectSession={switchSession} 
+                onNewSession={() => {
+                  startNewSession();
+                  sendMessage('[New Support Session Initiated]');
+                }} 
+                loading={loadingSessions} 
+              />
+            )}
 
-            {/* Scroll Area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <HumanHandoffBanner status={handoffStatus} message={bannerMessage} />
-              
-              <ContextPreview wallet={wallet.address} sessionId={sessionId} />
-
-              {messages.length <= 1 ? (
-                <div style={{ marginTop: '20px' }}>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '16px' }}>
-                    Hello! How can Pharos assist you with your PROS payments or settlements today?
-                  </p>
-                  <PromptSuggestions 
-                    wallet={wallet.address} 
-                    walletState={{ hasFailedPayments: true }} 
-                    onSelect={(text) => {
-                      setInputText(text);
-                    }} 
-                  />
-                </div>
-              ) : (
-                messages.filter(m => m.content !== '[New Support Session Initiated]').map((msg) => {
-                  if (msg.senderType === 'ai') {
-                    return <AIMessageBubble key={msg.id} message={msg} showDebug={showDebug} onSelectOption={(opt) => sendMessage(opt)} />;
-                  }
-                  
-                  const isUser = msg.senderType === 'user';
-                  return (
-                    <div 
-                      key={msg.id} 
-                      style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: isUser ? 'flex-end' : 'flex-start',
-                        marginBottom: '12px',
-                        maxWidth: '85%',
-                        alignSelf: isUser ? 'flex-end' : 'flex-start'
+            {/* Chat Panel */}
+            <div className="chat-panel">
+              {/* ── Chat Header ────────────────────────────────────────── */}
+              <div className="chat-header">
+                <div className="chat-header-left">
+                  {/* Mobile menu button */}
+                  {isMob && (
+                    <button
+                      onClick={() => setMobileDrawerOpen(true)}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        width: '32px', height: '32px',
+                        cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                        color: 'var(--text-secondary)',
+                        fontSize: '14px',
                       }}
+                      aria-label="Open sessions"
                     >
-                      <div 
-                        style={{
-                          background: isUser ? 'var(--primary, #6366f1)' : 'var(--bg-secondary, rgba(255,255,255,0.06))',
-                          borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                          padding: '10px 14px',
-                          color: '#ffffff',
-                          fontSize: '14px',
-                          lineHeight: '1.4'
-                        }}
-                      >
-                        {msg.content}
-                      </div>
-                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px', paddingLeft: '4px' }}>
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      ☰
+                    </button>
+                  )}
+                  <div className="chat-header-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+                    <img 
+                      src="/support-logo.png" 
+                      alt="PharosPay Support" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} 
+                      onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.textContent = '⚡'; }}
+                    />
+                  </div>
+                  <div>
+                    <p className="chat-header-name">Pharos Support</p>
+                    <p className="chat-header-subtitle">
+                      {handoffStatus === 'AI_ONLY' ? 'AI-powered assistant' : 'Live agent connected'}
+                    </p>
+                  </div>
+                  {showDebug && aiStatus.enabled && (
+                    <div className="chat-header-status">
+                      <span className="chat-header-status-dot" />
+                      {aiStatus.provider === 'grok' ? 'Grok' : 'OpenRouter'}
                     </div>
-                  );
-                })
-              )}
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {handoffStatus === 'AI_ONLY' ? (
+                    <button className="escalate-btn" onClick={() => setEscalationOpen(true)}>
+                      <Ic name="alert" size={12} color="#ef4444" />
+                      Escalate
+                    </button>
+                  ) : (
+                    <div className="chat-header-status">
+                      <span className="chat-header-status-dot" style={{ background: '#22c55e' }} />
+                      Live Agent
+                    </div>
+                  )}
+                </div>
+              </div>
 
-              {typing && <TypingIndicator />}
-              <div ref={aiChatMessagesEndRef} />
+              {/* ── Chat Messages Scroll Area ──────────────────────────── */}
+              <div className="chat-messages-area support-scroll">
+                <HumanHandoffBanner status={handoffStatus} message={bannerMessage} />
+                <ContextPreview wallet={wallet.address} sessionId={sessionId} />
+
+                {messages.length <= 1 ? (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PromptSuggestions 
+                      onSelect={(text) => setInputText(text)}
+                    />
+                  </div>
+                ) : (
+                  messages.filter(m => m.content !== '[New Support Session Initiated]').map((msg, idx, arr) => {
+                    const isNewGroup = idx === 0 || arr[idx - 1].senderType !== msg.senderType;
+                    const style = isNewGroup && idx > 0 ? { marginTop: '8px' } : {};
+
+                    if (msg.senderType === 'ai') {
+                      return (
+                        <AIMessageBubble 
+                          key={msg.id} 
+                          message={msg} 
+                          showDebug={showDebug} 
+                          onSelectOption={(opt) => sendMessage(opt)} 
+                          style={style}
+                        />
+                      );
+                    }
+                    
+                    // User bubble
+                    const time = msg.createdAt
+                      ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : '';
+                    return (
+                      <div key={msg.id} className="msg-row user" style={style}>
+                        <div className="user-bubble message-content">
+                          {renderMarkdownAndHashes(msg.content)}
+                        </div>
+                        <span className="msg-time" style={{ textAlign: 'right' }}>{time}</span>
+                      </div>
+                    );
+                  })
+                )}
+
+                {typing && <TypingIndicator />}
+                <div ref={aiChatMessagesEndRef} />
+              </div>
+
+              {/* ── Bottom Input Area ──────────────────────────────────── */}
+              <div className="chat-input-area">
+
+
+                <form onSubmit={handleSendAI}>
+                  <div className="chat-input-wrapper">
+                    <textarea
+                      ref={textareaRef}
+                      className="chat-textarea"
+                      value={inputText}
+                      onChange={(e) => {
+                        if (e.target.value.length <= MAX_INPUT_LENGTH) {
+                          setInputText(e.target.value);
+                        }
+                      }}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Ask Pharos Support anything…"
+                      rows={1}
+                    />
+                    <button
+                      type="submit"
+                      className="send-btn"
+                      disabled={loadingChat || typing || !inputText.trim()}
+                    >
+                      <Ic name="send" size={16} color="#fff" />
+                    </button>
+                  </div>
+                  <div className="chat-input-meta">
+                    <span className="input-hint">
+                      Enter to send · Shift+Enter for new line
+                    </span>
+                    <span className={`char-counter ${charCount > 1800 ? (charCount > 1950 ? 'danger' : 'warn') : ''}`}>
+                      {charCount > 0 ? `${charCount}/${MAX_INPUT_LENGTH}` : ''}
+                    </span>
+                  </div>
+                </form>
+              </div>
             </div>
 
-            {/* Bottom Controls */}
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {messages.length > 1 && (
-                <QuickReplyChips 
-                  onSelect={(text) => setInputText(text)} 
-                  walletState={{ hasFailedPayments: true }} 
-                />
-              )}
-
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!inputText.trim()) return;
-                  sendMessage(inputText);
-                  setInputText('');
-                }}
-                style={{ display: 'flex', gap: '8px' }}
-              >
-                <input 
-                  type="text" 
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Ask Pharos Support..."
-                  style={{
-                    flex: 1,
-                    background: 'var(--bg-tertiary, #0f172a)',
-                    border: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
-                    borderRadius: '8px',
-                    padding: '10px 12px',
-                    color: 'var(--text, #ffffff)',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={loadingChat || typing || !inputText.trim()}
-                  style={{
-                    background: 'var(--primary, #6366f1)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px 16px',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Ic name="send" size={14} color="#fff" />
-                </button>
-              </form>
-            </div>
+            {/* Escalation Modal */}
+            <EscalationModal 
+              isOpen={escalationOpen} 
+              onClose={() => setEscalationOpen(false)} 
+              onSubmit={handleEscalateSubmit} 
+              ticketId={messages.find(m => m.metadata?.ticketId)?.metadata?.ticketId}
+              userWallet={wallet.address}
+            />
           </div>
-
-          {/* Escalation Modal */}
-          <EscalationModal 
-            isOpen={escalationOpen} 
-            onClose={() => setEscalationOpen(false)} 
-            onSubmit={handleEscalateSubmit} 
-            ticketId={messages.find(m => m.metadata?.ticketId)?.metadata?.ticketId}
-          />
-        </div>
+        </>
       )}
 
-      {/* TAB: Create Ticket */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          TAB: Create Ticket (unchanged logic, same premium styling)
+         ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'create' && (
         <div className="page-enter">
           {createSuccess && (
@@ -730,7 +913,9 @@ export default function Support({ wallet }) {
         </div>
       )}
 
-      {/* TAB: My Tickets */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          TAB: My Tickets
+         ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'tickets' && !selectedTicket && (
         <div className="page-enter">
           {/* Filter Bar */}
@@ -905,23 +1090,18 @@ export default function Support({ wallet }) {
                   <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>({ticketDetail.messages?.length || 0} messages)</span>
                 </div>
 
-                <style>{`
-                  @keyframes ticketFadeIn {
-                    from { opacity: 0; transform: translateY(8px); }
-                    to { opacity: 1; transform: translateY(0); }
-                  }
-                  .ticket-bubble {
-                    animation: ticketFadeIn 0.3s ease-out forwards;
-                  }
-                `}</style>
-                <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {ticketDetail.messages?.map(msg => {
+                <div className="support-scroll ticket-messages-container" style={{ maxHeight: '400px', overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+                  {ticketDetail.messages?.map((msg, idx, arr) => {
                     const isUser = msg.senderType === 'user';
                     const isSystem = msg.senderType === 'system';
+                    const isNewGroup = idx === 0 || arr[idx - 1].senderType !== msg.senderType;
+                    const groupStyle = isNewGroup && idx > 0 ? { marginTop: '8px' } : {};
                     return (
-                      <div key={msg.id} className="ticket-bubble" style={{
-                        display: 'flex', flexDirection: 'column',
-                        alignItems: isUser ? 'flex-end' : 'flex-start',
+                      <div key={msg.id} className="msg-row" style={{
+                        alignItems: isUser ? 'flex-end' : isSystem ? 'center' : 'flex-start',
+                        animation: 'msg-in 0.3s ease-out forwards',
+                        overflowX: 'hidden',
+                        ...groupStyle
                       }}>
                         {isSystem ? (
                           <div style={{
@@ -942,15 +1122,8 @@ export default function Support({ wallet }) {
                               <Ic name={isUser ? 'wallet' : 'shield'} size={10} color={isUser ? 'var(--primary)' : '#8b5cf6'} />
                               {msg.senderName}
                             </div>
-                            <div style={{
-                              maxWidth: '80%', padding: '10px 14px', borderRadius: '12px',
-                              fontSize: '13px', lineHeight: '1.5', wordBreak: 'break-word',
-                              background: isUser ? 'var(--primary)' : 'var(--bg-secondary)',
-                              color: isUser ? '#fff' : 'var(--text)',
-                              borderBottomRightRadius: isUser ? '4px' : '12px',
-                              borderBottomLeftRadius: isUser ? '12px' : '4px',
-                            }}>
-                              {msg.message}
+                            <div className={`${isUser ? 'user-bubble' : 'ai-bubble'} message-content`}>
+                              {renderMarkdownAndHashes(msg.message)}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                               <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
@@ -973,7 +1146,7 @@ export default function Support({ wallet }) {
                     );
                   })}
                   {ticketTyping && (
-                    <div style={{ alignSelf: 'flex-start', marginLeft: '12px', animation: 'ticketFadeIn 0.25s ease-out forwards' }}>
+                    <div style={{ alignSelf: 'flex-start', marginLeft: '12px' }}>
                       <TypingIndicator />
                     </div>
                   )}
@@ -1016,7 +1189,9 @@ export default function Support({ wallet }) {
         </div>
       )}
 
-      {/* TAB: FAQ */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          TAB: FAQ
+         ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'faq' && (
         <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ marginBottom: '12px' }}>
@@ -1035,7 +1210,7 @@ export default function Support({ wallet }) {
                 style={{
                   width: '100%', padding: '16px 20px', border: 'none', background: 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                  cursor: 'pointer', textAlign: 'left',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
@@ -1049,12 +1224,7 @@ export default function Support({ wallet }) {
                   </div>
                   <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{faq.q}</span>
                 </div>
-                <Ic
-                  name="arrow"
-                  size={14}
-                  color="var(--text-secondary)"
-                  className={openFaq === idx ? '' : ''}
-                />
+                <Ic name="arrow" size={14} color="var(--text-secondary)" />
               </button>
               {openFaq === idx && (
                 <div style={{

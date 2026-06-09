@@ -28,7 +28,9 @@ module.exports = (db) => {
         merchantName: s.metadata?.merchantName || s.merchant_identifier,
         fiatCurrency: s.fiat_currency,
         fiatAmount: Number(s.fiat_amount),
-        prosAmount: s.pros_amount,
+        prosAmount: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
+        prosAmountExecuted: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
+        usdAmountAtExecution: s.usd_amount_at_execution ? Number(s.usd_amount_at_execution) : null,
         feeAmount: s.metadata?.feeAmount || '0.0000',
         paymentRail: s.payment_rail,
         country: s.country,
@@ -85,7 +87,9 @@ module.exports = (db) => {
           paymentRail: payment.payment_rail,
           fiatAmount: Number(payment.fiat_amount),
           fiatCurrency: payment.fiat_currency,
-          prosAmount: Number(payment.pros_amount),
+          prosAmount: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
+          prosAmountExecuted: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
+          usdAmountAtExecution: payment.usd_amount_at_execution ? Number(payment.usd_amount_at_execution) : null,
           status: payment.status,
           created_at: payment.created_at,
           utr: settlement ? settlement.utr : null,
@@ -99,6 +103,53 @@ module.exports = (db) => {
       });
     } catch (err) {
       console.error('Failed to fetch payment details:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/payments/:paymentId/debug
+  router.get('/payments/:paymentId/debug', async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+      let payment = null;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentId);
+      if (isUuid) {
+        payment = await db.payments.findById(paymentId);
+      }
+      if (!payment) {
+        payment = await db.payments.findByPharosPaymentId(paymentId);
+      }
+
+      if (!payment) {
+        return res.status(404).json({ success: false, error: 'Payment not found' });
+      }
+
+      const fiatAmount = Number(payment.fiat_amount);
+      const usdInrRate = payment.usd_inr_rate ? Number(payment.usd_inr_rate) : (payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : (payment.usd_fiat_rate ? Number(payment.usd_fiat_rate) : null));
+      const prosUsdPrice = payment.pros_usd_price ? Number(payment.pros_usd_price) : (payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : (payment.pros_usd_rate ? Number(payment.pros_usd_rate) : null));
+      const storedProsAmount = Number(payment.pros_amount_executed || payment.pros_amount);
+      const feePercent = payment.fee_percent ? Number(payment.fee_percent) : 2.00;
+
+      let expectedProsAmount = null;
+      let differencePercent = null;
+
+      if (usdInrRate && prosUsdPrice) {
+        expectedProsAmount = Number((((fiatAmount / usdInrRate) / prosUsdPrice) * 1.02).toFixed(6));
+        const diff = Math.abs(storedProsAmount - expectedProsAmount);
+        differencePercent = Number(((diff / expectedProsAmount) * 100).toFixed(6));
+      }
+
+      res.json({
+        fiatAmount,
+        usdInrRate,
+        prosUsdPrice,
+        feePercent,
+        storedProsAmount,
+        expectedProsAmount,
+        differencePercent
+      });
+    } catch (err) {
+      console.error('Failed to get payment debug details:', err.message);
       res.status(500).json({ success: false, error: err.message });
     }
   });

@@ -93,6 +93,7 @@ export function PaymentProvider({ children, wallet }) {
           console.log(`PaymentContext [Debug]: Contract reports ${paymentIds.length} payments; backend has ${backendData.length}. Querying contract detail tuples...`);
           const paymentPromises = paymentIds.map(async (id) => {
             const p = await router.getPayment(id);
+            const matchedBackend = backendData.find(bp => bp.pharosPaymentId === p.id || bp.id === p.id);
             return {
               id: p.id,
               merchantId: p.merchantId,
@@ -100,11 +101,15 @@ export function PaymentProvider({ children, wallet }) {
               fiatCurrency: p.fiatCurrency,
               fiatAmount: parseFloat(ethers.formatEther(p.fiatAmount)),
               prosAmount: formatPROS(p.prosAmount),
-              feeAmount: formatPROS(p.feeAmount),
+              feeAmount: matchedBackend?.feeAmount || formatPROS(p.feeAmount),
               paymentRail: p.paymentRail,
               country: p.country,
               timestamp: new Date(Number(p.timestamp) * 1000),
               status: ['PENDING', 'SETTLED', 'FAILED'][p.status],
+              prosPriceAtExecution: matchedBackend ? matchedBackend.prosPriceAtExecution : null,
+              fxRateAtExecution: matchedBackend ? matchedBackend.fxRateAtExecution : null,
+              priceSource: matchedBackend ? matchedBackend.priceSource : null,
+              quoteTimestamp: matchedBackend ? matchedBackend.quoteTimestamp : null
             };
           });
           finalPayments = await Promise.all(paymentPromises);

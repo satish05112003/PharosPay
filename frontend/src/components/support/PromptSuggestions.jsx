@@ -1,110 +1,77 @@
-import React, { useState } from 'react';
+import React from 'react';
+import './support.css';
 
-export default function PromptSuggestions({ wallet, onSelect }) {
-  const [activeTab, setActiveTab] = useState('payments');
+const QUICK_SUGGESTIONS = [
+  {
+    icon: '📍',
+    title: 'Track My Settlement',
+    desc: 'Check status of pending or recent payment settlements',
+    query: 'Where is my settlement? Show me the status of my latest payment.',
+  },
+  {
+    icon: '💸',
+    title: 'Missing Funds',
+    desc: 'Funds deducted but not received by merchant',
+    query: 'My funds were deducted but the merchant did not receive the payment.',
+  },
+  {
+    icon: '🧾',
+    title: 'Verify Receipt',
+    desc: 'Authenticate and validate a payment receipt',
+    query: 'Help me verify the authenticity of my payment receipt.',
+  },
+  {
+    icon: '🏦',
+    title: 'Bank Transfer Issue',
+    desc: 'Problems with UPI, PIX, ACH, or SEPA transfers',
+    query: 'I have an issue with a bank transfer. The payment was not credited.',
+  },
+  {
+    icon: '🔍',
+    title: 'Find Transaction',
+    desc: 'Look up a past payment by ID or hash',
+    query: 'Can you help me find a specific transaction by its payment ID or hash?',
+  },
+  {
+    icon: '⛓️',
+    title: 'Pharos Ecosystem',
+    desc: 'Learn about Pharos blockchain, PROS tokens, and DeFi',
+    query: 'Tell me about the Pharos ecosystem and how PROS tokens work.',
+  },
+  {
+    icon: '🛠️',
+    title: 'Technical Support',
+    desc: 'Wallet connection, smart contract, or app errors',
+    query: 'I am experiencing a technical issue with the PharosPay application.',
+  },
+  {
+    icon: '📈',
+    title: 'PROS Exchange Rate',
+    desc: 'Current rates, price history, and conversion quotes',
+    query: 'What is the current PROS/USD rate and how is it calculated?',
+  },
+];
 
-  const categories = {
-    payments: {
-      label: '💰 Payments',
-      items: [
-        { title: 'Check latest payment', query: 'Show my latest payment' },
-        { title: 'Find payment receipt', query: 'How can I find the receipt for my last transaction?' },
-        { title: 'Verify transaction hash', query: 'Can you help me verify my transaction hash?' },
-        { title: 'View settlement details', query: 'Where is my settlement processing?' },
-        { title: 'Find UTR number', query: 'How do I locate the UTR reference number for my payment?' }
-      ]
-    },
-    support: {
-      label: '🛠️ Support',
-      items: [
-        { title: 'Open support ticket', query: 'I would like to open a support ticket' },
-        { title: 'Contact support team', query: 'How can I contact the official support team?' },
-        { title: 'Escalate issue', query: 'I want to escalate my payment issue to a human agent' }
-      ]
-    },
-    pharos: {
-      label: '🤖 Pharos',
-      items: [
-        { title: 'What is Pharos?', query: 'What is Pharos?' },
-        { title: 'Open official documentation', query: 'Where can I read the official Pharos documentation?' },
-        { title: 'View explorer', query: 'What is the Pharos scan explorer URL?' },
-        { title: 'Latest ecosystem updates', query: 'What are the latest announcements and ecosystem projects on Pharos?' }
-      ]
-    },
-    merchant: {
-      label: '💼 Merchant',
-      items: [
-        { title: 'Merchant dashboard help', query: 'How do I onboarding my merchant profile in Merchant OS?' },
-        { title: 'Merchant settlement status', query: 'What is my merchant settlement status?' }
-      ]
-    },
-    wallet: {
-      label: '🔑 Wallet',
-      items: [
-        { title: 'Show wallet activity', query: 'Show my wallet activity' },
-        { title: 'View recent transactions', query: 'Show my recent transactions' }
-      ]
-    }
-  };
-
+export default function PromptSuggestions({ onSelect }) {
   return (
-    <div className="prompt-suggestions-container" style={{ margin: '16px 0' }}>
-      {/* Category Tabs */}
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '10px', borderBottom: '1px solid var(--border, rgba(255,255,255,0.06))', marginBottom: '12px' }}>
-        {Object.entries(categories).map(([key, cat]) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '16px',
-              border: activeTab === key ? '1px solid var(--primary, #6366f1)' : '1px solid transparent',
-              background: activeTab === key ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-              color: activeTab === key ? 'var(--primary, #6366f1)' : 'var(--text-secondary, #94a3b8)',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease',
-              outline: 'none'
-            }}
-          >
-            {cat.label}
-          </button>
-        ))}
+    <div style={{ marginTop: '12px' }}>
+      <div className="suggestions-welcome">
+        <div className="suggestions-welcome-title">How can Pharos Support help you?</div>
+        <div className="suggestions-welcome-sub">
+          Select a topic below or type your question directly
+        </div>
       </div>
 
-      {/* Suggestion Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-        {categories[activeTab].items.map((item, idx) => (
+      <div className="suggestions-grid">
+        {QUICK_SUGGESTIONS.map((item, idx) => (
           <button
             key={idx}
+            className="suggestion-card"
             onClick={() => onSelect(item.query)}
-            style={{
-              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.03))',
-              border: '1px solid var(--border, rgba(255, 255, 255, 0.08))',
-              borderRadius: '10px',
-              padding: '10px 12px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              outline: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-              e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--bg-secondary, rgba(255, 255, 255, 0.03))';
-              e.currentTarget.style.borderColor = 'var(--border, rgba(255, 255, 255, 0.08))';
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text, #ffffff)' }}>
-              {item.title}
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px' }}>
-              Click to ask
-            </div>
+            <div className="suggestion-card-icon">{item.icon}</div>
+            <div className="suggestion-card-title">{item.title}</div>
+            <div className="suggestion-card-desc">{item.desc}</div>
           </button>
         ))}
       </div>

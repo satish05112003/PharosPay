@@ -1,37 +1,36 @@
 import React from 'react';
+import './support.css';
 
 export default function HumanHandoffBanner({ status, message }) {
-  if (status === 'AI_ONLY') return null;
+  if (status === 'AI_ONLY' || !message) return null;
 
   const isActive = status === 'HUMAN_ACTIVE';
 
   return (
-    <div 
-      className="handoff-banner" 
+    <div
+      className="handoff-banner"
       style={{
-        background: isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-        border: isActive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
-        borderRadius: '12px',
-        padding: '12px 16px',
-        marginBottom: '16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        color: isActive ? '#10b981' : '#f59e0b',
-        fontSize: '13px',
-        fontWeight: 500
+        background: isActive ? 'rgba(34, 197, 94, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+        border: `1px solid ${isActive ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`,
+        color: isActive ? '#4ade80' : '#fbbf24',
       }}
     >
-      <div 
+      <div
         style={{
-          width: '8px',
-          height: '8px',
+          width: '7px',
+          height: '7px',
           borderRadius: '50%',
-          background: isActive ? '#10b981' : '#f59e0b',
-          animation: 'pulse 1.5s infinite'
+          background: isActive ? '#22c55e' : '#f59e0b',
+          flexShrink: 0,
+          boxShadow: isActive
+            ? '0 0 6px rgba(34, 197, 94, 0.5)'
+            : '0 0 6px rgba(245, 158, 11, 0.5)',
+          animation: 'pulse-dot 2s ease-in-out infinite',
         }}
       />
-      <span style={{ flex: 1 }}>{message}</span>
+      <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, lineHeight: 1.4 }}>
+        {message}
+      </span>
     </div>
   );
 }

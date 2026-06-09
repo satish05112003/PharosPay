@@ -5,6 +5,7 @@ import { CONTRACTS, ABI, CURRENCIES, API_BASE } from '../config';
 import { formatPROS, parseFiatAmount, getExplorerTxUrl } from '../hooks/useContract';
 import { Ic } from '../components/Icons';
 import { usePayments } from '../context/PaymentContext';
+import ReceiptViewer from '../components/ReceiptViewer';
 
 const COUNTRIES = [
   { id: "IN", name: "India", flag: "🇮🇳", currency: "INR", rate: 83.56, methods: ["UPI", "Bank Transfer"] },
@@ -329,8 +330,9 @@ export default function Pay({ wallet }) {
       setPaymentStatus('settled');
       const paymentId = receipt.logs?.[0]?.topics?.[1] || '0x';
       
+      let dbPaymentId = null;
       try {
-        await fetch(`${API_BASE}/settle`, {
+        const settleRes = await fetch(`${API_BASE}/settle`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -347,6 +349,10 @@ export default function Pay({ wallet }) {
             feeAmount: quote.feeAmount.toString()
           }),
         });
+        const settleData = await settleRes.json();
+        if (settleData.success && settleData.settlement) {
+          dbPaymentId = settleData.settlement.paymentId;
+        }
       } catch (e) {
         console.warn('Settlement agent offline:', e.message);
       }
@@ -359,6 +365,9 @@ export default function Pay({ wallet }) {
       refreshPayments();
 
       setTxResult({
+        id: dbPaymentId || paymentId,
+        paymentId: dbPaymentId || paymentId,
+        pharosPaymentId: paymentId,
         txHash: receipt.hash,
         merchantId,
         merchantName: merchantName || 'Merchant Store',
@@ -1039,75 +1048,10 @@ export default function Pay({ wallet }) {
 
       {/* STEP 6: Success Receipt Invoice */}
       {step === 6 && txResult && (
-        <div className="page-enter">
-          <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ 
-              width: "60px", 
-              height: "60px", 
-              borderRadius: "50%", 
-              background: "var(--success-light)", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              margin: "0 auto 16px", 
-              border: "2.5px solid var(--success)" 
-            }}>
-              <Ic name="check" size={30} color="var(--success)" />
-            </div>
-            
-            <h2 style={{ fontSize: "22px", fontWeight: 800, color: "var(--text)", marginBottom: "8px" }}>
-              Payment Settled!
-            </h2>
-            <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "24px" }}>
-              Transfer completed successfully to local merchant.
-            </p>
-          </div>
-
-          {/* Printable Invoice Receipt block */}
-          <div className="card" style={{ padding: "20px", marginBottom: "24px" }} id="receipt-print-area">
-            {[
-              ["Merchant Name", txResult.merchantName],
-              ["Identifier", txResult.merchantId],
-              ["Country", `${txResult.country} ${selectedCountryInfo.flag}`],
-              ["Rail Method", txResult.paymentRail],
-              ["Local Amount Sent", `${txResult.fiatAmount} ${txResult.currency}`],
-              ["Platform Fee", `${txResult.feeAmount} PROS`],
-              ["Total PROS Deducted", `${txResult.prosAmount} PROS`],
-              ["Timestamp", txResult.timestamp.toLocaleString()],
-              ["Status", "SETTLED / Completed"]
-            ].map(([lbl, val], idx) => (
-              <div 
-                key={lbl} 
-                style={{ 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  padding: "10px 0", 
-                  borderBottom: idx < 8 ? "1px solid var(--border-light)" : "none",
-                  fontSize: "13px"
-                }}
-              >
-                <span style={{ color: "var(--text-secondary)" }}>{lbl}</span>
-                <span style={{ fontWeight: 700, color: "var(--text)", textAlign: "right" }}>{val}</span>
-              </div>
-            ))}
-            <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "2px solid var(--border)", fontSize: "11px", color: "var(--text-secondary)", fontFamily: "monospace", wordBreak: "break-all" }}>
-              TxHash: {txResult.txHash}
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
-            <button className="btn btn-secondary" onClick={handleCopyReceipt}>
-              <Ic name="copy" size={15} color="var(--text-secondary)" /> Copy Receipt
-            </button>
-            <button className="btn btn-secondary" onClick={handleDownloadPDF}>
-              <Ic name="dl" size={15} color="var(--text-secondary)" /> Download PDF
-            </button>
-          </div>
-
-          <button className="btn btn-primary" onClick={handleReset} style={{ width: "100%", justifyContent: "center" }}>
-            New Payment Flow
-          </button>
-        </div>
+        <ReceiptViewer
+          payment={txResult}
+          onClose={handleReset}
+        />
       )}
 
       {/* Recent Merchants helper panel */}

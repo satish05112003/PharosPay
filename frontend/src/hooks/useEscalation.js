@@ -7,8 +7,8 @@ export default function useEscalation(wallet, sessionId) {
   const [error, setError] = useState(null);
 
   const escalate = useCallback(async (formData) => {
-    if (!wallet || !sessionId) return null;
-    
+    if (!wallet) return null;
+
     setEscalating(true);
     setError(null);
     setEscalationResult(null);
@@ -19,21 +19,26 @@ export default function useEscalation(wallet, sessionId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wallet,
-          sessionId,
+          // walletAddress mirrors wallet — backend also accepts walletAddress separately
+          walletAddress: formData.walletAddress || wallet,
+          sessionId: sessionId || null,
           email: formData.email,
           telegram: formData.telegram || null,
           discord: formData.discord || null,
           twitter: formData.twitter || null,
+          // transactionHash from EscalationModal form
+          transactionHash: formData.transactionHash || null,
           description: formData.description,
-          severity: formData.severity || 'MEDIUM',
+          severity: formData.severity || formData.urgency?.toUpperCase() || 'MEDIUM',
           confidence: formData.confidence || 0.85,
-          ticketId: formData.ticketId || null
+          ticketId: formData.ticketId || null,
+          urgency: formData.urgency || null
         })
       });
 
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result.error || 'Escalation failed.');
+        throw new Error(result.error || `Escalation failed (HTTP ${response.status}).`);
       }
 
       setEscalationResult(result);

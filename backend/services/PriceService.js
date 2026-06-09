@@ -8,15 +8,27 @@ class PriceService {
   constructor() {
     this.provider = null;
     this.oracle = null;
+    this.wallet = null;
+    this.oracleWritable = null;
 
     const rpcUrl = process.env.RPC_URL || 'https://atlantic.dplabs-internal.com';
     const oracleAddr = process.env.PRICE_ORACLE;
+    const operatorKey = process.env.PHAROS_OPERATOR_PRIVATE_KEY;
 
     if (oracleAddr) {
       try {
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
         this.oracle = new ethers.Contract(oracleAddr, ORACLE_ABI, this.provider);
         console.log('PriceService: Connected to on-chain oracle at', oracleAddr);
+
+        if (operatorKey) {
+          this.wallet = new ethers.Wallet(operatorKey, this.provider);
+          this.oracleWritable = new ethers.Contract(oracleAddr, [
+            'function setPrices(string[] calldata pairs, uint256[] calldata prices) external',
+            'function setPrice(string calldata pair, uint256 price) external'
+          ], this.wallet);
+          console.log('PriceService: Initialized writable oracle contract using operator key');
+        }
       } catch (e) {
         console.warn('PriceService: Failed to connect to oracle:', e.message);
       }
@@ -34,8 +46,25 @@ class PriceService {
     };
   }
 
+  async syncOracle(pairs, prices) {
+    if (!this.oracleWritable) {
+      console.warn('PriceService: Writable oracle not configured.');
+      return null;
+    }
+    try {
+      console.log(`PriceService: Syncing oracle on-chain for pairs [${pairs.join(', ')}] with prices [${prices.join(', ')}]`);
+      const oraclePrices = prices.map(p => Math.round(Number(p) * 1e8));
+      const tx = await this.oracleWritable.setPrices(pairs, oraclePrices);
+      console.log(`PriceService: Oracle update tx sent: ${tx.hash}`);
+      return tx;
+    } catch (err) {
+      console.error('PriceService: Failed to sync oracle on-chain:', err.message);
+      return null;
+    }
+  }
+
   async fetchProsUsdPrice() {
-    // Coinbase Exchange API ONLY
+    // 1. Coinbase Exchange API (Primary source of truth for live price)
     try {
       const res = await fetch('https://api.exchange.coinbase.com/products/PROS-USD/ticker', {
         headers: {
@@ -53,15 +82,15 @@ class PriceService {
       }
       throw new Error(`Coinbase ticker returned status: ${res.status}`);
     } catch (e) {
-      console.warn('PriceService: Coinbase query failed:', e.message);
+      console.warn('PriceService: Coinbase query failed, checking fallbacks:', e.message);
       
+      // 2. Cache fallback
       const cached = this.cache['PROS/USD'];
-      const cacheAgeMs = Date.now() - cached.updatedAt;
+      const cacheAgeMs = Date.now() - (cached ? cached.updatedAt : 0);
       const staleLimitMs = (parseInt(process.env.PRICE_STALE_LIMIT) || 300) * 1000;
       
-      // If we have a cached price that is valid (not the initial seed) and not stale:
       if (cached && cached.status === 'ok' && cacheAgeMs < staleLimitMs) {
-        console.warn(`PriceService: Coinbase failed, using cached price from ${Math.round(cacheAgeMs / 1000)}s ago`);
+        console.warn(`PriceService: Using cached price from ${Math.round(cacheAgeMs / 1000)}s ago`);
         return {
           price: cached.price,
           source: cached.source,
@@ -70,7 +99,20 @@ class PriceService {
         };
       }
       
-      // If too stale or no valid cached price, throw error
+      // 3. Oracle fallback (Last resort)
+      if (this.oracle) {
+        try {
+          console.warn('PriceService: Attempting on-chain oracle fallback query for PROS/USD...');
+          const [price, updatedAt] = await this.oracle.getPrice('PROS/USD');
+          const priceNum = Number(price) / 1e8;
+          if (priceNum > 0) {
+            return { price: priceNum, source: 'PharosOracle', updatedAt: Number(updatedAt) * 1000, status: 'fallback' };
+          }
+        } catch (oracleErr) {
+          console.error('PriceService: Oracle fallback query failed for PROS/USD:', oracleErr.message);
+        }
+      }
+      
       throw new Error('Market data unavailable');
     }
   }
@@ -78,7 +120,7 @@ class PriceService {
   async fetchUsdRate(currency) {
     const pair = `USD/${currency}`;
 
-    // Try ExchangeRate API
+    // 1. ExchangeRate API (Primary source of truth for live price)
     try {
       const res = await fetch('https://open.er-api.com/v6/latest/USD');
       if (res.ok) {
@@ -89,22 +131,9 @@ class PriceService {
       }
       throw new Error(`ExchangeRate API returned status: ${res.status}`);
     } catch (e) {
-      console.warn(`PriceService: ExchangeRate API failed for ${pair}:`, e.message);
-      
-      // Try Oracle fallback
-      if (this.oracle) {
-        try {
-          const [price, updatedAt] = await this.oracle.getPrice(pair);
-          const priceNum = Number(price) / 1e8;
-          if (priceNum > 0) {
-            return { price: priceNum, source: 'PharosOracle', updatedAt: Number(updatedAt) * 1000, status: 'ok' };
-          }
-        } catch (oracleErr) {
-          console.warn(`PriceService: Oracle fallback failed for ${pair}:`, oracleErr.message);
-        }
-      }
+      console.warn(`PriceService: ExchangeRate API failed for ${pair}, checking fallbacks:`, e.message);
 
-      // Cache fallback
+      // 2. Cache fallback
       const cached = this.cache[pair];
       const cacheAgeMs = Date.now() - (cached ? cached.updatedAt : 0);
       const staleLimitMs = (parseInt(process.env.PRICE_STALE_LIMIT) || 300) * 1000;
@@ -116,6 +145,20 @@ class PriceService {
           updatedAt: cached.updatedAt,
           status: 'fallback'
         };
+      }
+
+      // 3. Oracle fallback (Last resort)
+      if (this.oracle) {
+        try {
+          console.warn(`PriceService: Attempting on-chain oracle fallback query for ${pair}...`);
+          const [price, updatedAt] = await this.oracle.getPrice(pair);
+          const priceNum = Number(price) / 1e8;
+          if (priceNum > 0) {
+            return { price: priceNum, source: 'PharosOracle', updatedAt: Number(updatedAt) * 1000, status: 'fallback' };
+          }
+        } catch (oracleErr) {
+          console.error(`PriceService: Oracle fallback query failed for ${pair}:`, oracleErr.message);
+        }
       }
 
       throw new Error('Market data unavailable');

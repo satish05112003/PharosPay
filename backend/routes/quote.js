@@ -44,6 +44,11 @@ router.get('/quote', async (req, res) => {
     const liveProsPrice = prosDetails.price;
     const liveFxRate = fiatDetails.price;
 
+    // Trigger on-chain PriceOracle update in the background to ensure parity
+    priceService.syncOracle(['PROS/USD', railInfo.fiatPair], [liveProsPrice, liveFxRate]).catch(err => {
+      console.error('Quote Route: Failed to update oracle in background:', err.message);
+    });
+
     const usdAmount = amount / liveFxRate;
     const prosAmount = usdAmount / liveProsPrice;
     const feeAmount = prosAmount * (feeRate / 10000);

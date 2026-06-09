@@ -57,7 +57,7 @@ class SimulationAdapter extends BaseProvider {
     if (elapsed > 5000) {
       const year = new Date().getFullYear();
       const utrSuffix = String(Math.floor(Math.random() * 900) + 100);
-      const utr = 'UPI174928371' + utrSuffix;
+      const utr = 'SIM-UPI-174928371' + utrSuffix;
       const counter = String(Math.floor(Math.random() * 10000)).padStart(6, '0');
       const referenceNumber = `PHAROS-${year}-${counter}`;
 
@@ -106,7 +106,7 @@ class SimulationAdapter extends BaseProvider {
       paymentId,
       providerReference: rawPayload.providerReference || 'SIM_WEBHOOK_' + uuidv4(),
       status: status || 'SUCCESS',
-      utr: utr || 'UPI' + Date.now().toString().slice(-12),
+      utr: utr || 'SIM-UPI-' + Date.now().toString().slice(-12),
       referenceNumber: referenceNumber || 'PHAROS-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 100000)).padStart(6, '0'),
       failureReason: failureReason || null,
       rawPayload

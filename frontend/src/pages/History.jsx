@@ -128,97 +128,153 @@ export default function History({ wallet }) {
         </button>
       </div>
 
-      {/* Filter and search controllers */}
-      <div className="card" style={{ padding: "16px", marginBottom: "20px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", alignItems: "end" }}>
-          {/* Search bar */}
-          <div className="form-group" style={{ marginBottom: 0, gridColumn: isMob ? "span 1" : "span 2" }}>
-            <label className="form-label">Search</label>
-            <div className="form-input-wrapper">
-              <span className="form-prefix" style={{ padding: "0 8px 0 12px" }}>
-                <Ic name="search" size={15} color="var(--text-secondary)" />
-              </span>
-              <input 
-                className="form-input" 
-                type="text" 
-                placeholder="Merchant, Hash, ID..." 
-                value={search} 
-                onChange={(e) => setSearch(e.target.value)} 
-              />
-            </div>
+      {/* Premium Filter Bar — single glass row */}
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '14px',
+        padding: '12px 16px',
+        marginBottom: '20px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '10px',
+        alignItems: 'center',
+      }}>
+        {/* Search */}
+        <div style={{ flex: '2 1 200px', position: 'relative', minWidth: '160px' }}>
+          <div style={{
+            position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+            pointerEvents: 'none', display: 'flex', alignItems: 'center'
+          }}>
+            <Ic name="search" size={14} color="var(--text-secondary)" />
           </div>
-
-          {/* Country filter dropdown */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Country</label>
-            <div className="form-input-wrapper">
-              <select 
-                className="form-input" 
-                value={countryFilter} 
-                onChange={(e) => setCountryFilter(e.target.value)}
-                style={{ border: "none", background: "transparent" }}
-              >
-                <option value="all">🌍 All Countries</option>
-                <option value="IN">🇮🇳 India</option>
-                <option value="BR">🇧🇷 Brazil</option>
-                <option value="SG">🇸🇬 Singapore</option>
-                <option value="US">🇺🇸 USA</option>
-                <option value="TH">🇹🇭 Thailand</option>
-                <option value="ID">🇮🇩 Indonesia</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Status filter dropdown */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Status</label>
-            <div className="form-input-wrapper">
-              <select 
-                className="form-input" 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ border: "none", background: "transparent" }}
-              >
-                <option value="all">All Status</option>
-                <option value="SETTLED">Completed</option>
-                <option value="PENDING">Pending</option>
-                <option value="FAILED">Failed</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Date range filter dropdown */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Date Range</label>
-            <div className="form-input-wrapper">
-              <select 
-                className="form-input" 
-                value={dateFilter} 
-                onChange={(e) => setDateFilter(e.target.value)}
-                style={{ border: "none", background: "transparent" }}
-              >
-                <option value="all">📅 All Time</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Sort order toggle */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Sort Date</label>
-            <button 
-              className="btn btn-secondary" 
-              style={{ width: "100%", justifyContent: "space-between", height: "45px" }}
-              onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-            >
-              <span>{sortOrder === "desc" ? "Newest First" : "Oldest First"}</span>
-              <Ic name="sw" size={14} color="var(--text-secondary)" />
-            </button>
-          </div>
+          <input
+            type="text"
+            placeholder="Search merchant, ID, hash…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: '100%', height: '40px', background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px',
+              color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit',
+              paddingLeft: '36px', paddingRight: '12px', outline: 'none',
+              transition: 'border-color 0.2s, background 0.2s', boxSizing: 'border-box',
+            }}
+            onFocus={e => { e.target.style.borderColor = 'var(--primary)'; e.target.style.background = 'rgba(99,102,241,0.06)'; }}
+            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.background = 'rgba(255,255,255,0.05)'; }}
+          />
         </div>
+
+        {/* Country */}
+        <div style={{ flex: '1 1 130px', position: 'relative', minWidth: '120px' }}>
+          <select
+            value={countryFilter}
+            onChange={(e) => setCountryFilter(e.target.value)}
+            style={{
+              width: '100%', height: '40px', background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px',
+              color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit',
+              padding: '0 12px', outline: 'none', cursor: 'pointer',
+              transition: 'border-color 0.2s', appearance: 'none', boxSizing: 'border-box',
+            }}
+            onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+          >
+            <option value="all">🌍 All Countries</option>
+            <option value="IN">🇮🇳 India</option>
+            <option value="BR">🇧🇷 Brazil</option>
+            <option value="SG">🇸🇬 Singapore</option>
+            <option value="US">🇺🇸 USA</option>
+            <option value="TH">🇹🇭 Thailand</option>
+            <option value="ID">🇮🇩 Indonesia</option>
+          </select>
+        </div>
+
+        {/* Status */}
+        <div style={{ flex: '1 1 130px', minWidth: '120px' }}>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              width: '100%', height: '40px', background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px',
+              color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit',
+              padding: '0 12px', outline: 'none', cursor: 'pointer',
+              transition: 'border-color 0.2s', appearance: 'none', boxSizing: 'border-box',
+            }}
+            onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+          >
+            <option value="all">All Status</option>
+            <option value="SETTLED">✅ Completed</option>
+            <option value="PROS_LOCKED">⏳ Locked</option>
+            <option value="SETTLEMENT_PROCESSING">🔄 Processing</option>
+            <option value="SETTLEMENT_FAILED">❌ Failed</option>
+            <option value="REFUNDED">↩ Refunded</option>
+          </select>
+        </div>
+
+        {/* Date Range */}
+        <div style={{ flex: '1 1 130px', minWidth: '120px' }}>
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            style={{
+              width: '100%', height: '40px', background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px',
+              color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit',
+              padding: '0 12px', outline: 'none', cursor: 'pointer',
+              transition: 'border-color 0.2s', appearance: 'none', boxSizing: 'border-box',
+            }}
+            onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+          >
+            <option value="all">📅 All Time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+          </select>
+        </div>
+
+        {/* Sort Toggle */}
+        <button
+          onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+          style={{
+            height: '40px', padding: '0 14px', flexShrink: 0,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '10px', color: 'var(--text)', fontSize: '13px',
+            fontFamily: 'inherit', cursor: 'pointer', display: 'flex',
+            alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+            transition: 'border-color 0.2s, background 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+        >
+          <Ic name="sw" size={13} color="var(--text-secondary)" />
+          {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+        </button>
+
+        {/* Active filter count pill */}
+        {(search || countryFilter !== 'all' || statusFilter !== 'all' || dateFilter !== 'all') && (
+          <button
+            onClick={() => { setSearch(''); setCountryFilter('all'); setStatusFilter('all'); setDateFilter('all'); }}
+            style={{
+              height: '40px', padding: '0 12px', flexShrink: 0,
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+              borderRadius: '10px', color: '#ef4444', fontSize: '12px',
+              fontFamily: 'inherit', cursor: 'pointer', fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: '5px',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.18)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+          >
+            <Ic name="x" size={12} color="#ef4444" /> Clear
+          </button>
+        )}
       </div>
+
 
       {/* List Layout Rendering */}
       {isLoading ? (
@@ -274,8 +330,8 @@ export default function History({ wallet }) {
                 </div>
                 
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-secondary)", marginTop: "8px", borderTop: "1px dashed var(--border-light)", paddingTop: "8px" }}>
-                  <span>PROS Price: ${Number(p.prosPriceAtExecution || 0).toFixed(4)}</span>
-                  <span>FX Rate: 1 USD = {Number(p.fxRateAtExecution || 0).toFixed(2)} {p.fiatCurrency}</span>
+                  <span>PROS Price: {p.prosPriceAtExecution ? `$${Number(p.prosPriceAtExecution).toFixed(4)}` : 'Execution data unavailable'}</span>
+                  <span>FX Rate: {p.fxRateAtExecution ? `1 USD = ${Number(p.fxRateAtExecution).toFixed(4)} ${p.fiatCurrency}` : 'Execution data unavailable'}</span>
                 </div>
 
                 <button
@@ -342,10 +398,10 @@ export default function History({ wallet }) {
                       </td>
                       <td>
                         <div style={{ fontSize: "12px", color: "var(--text)", fontWeight: 600 }}>
-                          PROS: ${Number(p.prosPriceAtExecution || 0).toFixed(4)}
+                          PROS: {p.prosPriceAtExecution ? `$${Number(p.prosPriceAtExecution).toFixed(4)}` : 'Execution data unavailable'}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                          1 USD = {Number(p.fxRateAtExecution || 0).toFixed(2)} {p.fiatCurrency}
+                          {p.fxRateAtExecution ? `1 USD = ${Number(p.fxRateAtExecution).toFixed(4)} ${p.fiatCurrency}` : 'Execution data unavailable'}
                         </div>
                       </td>
                       <td>

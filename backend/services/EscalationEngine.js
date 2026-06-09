@@ -1,4 +1,5 @@
 const emailQueue = require('../queues/emailQueue');
+const EmailService = require('./EmailService');
 
 const SLA_MAP = {
   'CRITICAL': 1,
@@ -14,15 +15,17 @@ class EscalationEngine {
   }
 
   /**
-   * Main escalation coordinator creating contacts, events, analysis, and queueing notification jobs
+   * Main escalation coordinator — Redis-resilient email dispatch.
+   * Falls back to direct EmailService call if BullMQ/Redis is offline.
    */
   async createEscalation({ sessionId, wallet, email, telegram, discord, twitter, description, severity, confidence, ticketId, walletAddress, transactionHash }) {
     const resolvedSeverity = (severity || 'MEDIUM').toUpperCase();
     const slaHours = SLA_MAP[resolvedSeverity] || 12;
     const resolvedConfidence = confidence !== undefined ? parseFloat(confidence) : 0.85;
+    const effectiveWallet = walletAddress || wallet;
 
     const formattedDescription = `[USER ESCALATION DETAILS]
-Wallet Address: ${walletAddress || wallet}
+Wallet Address: ${effectiveWallet}
 Transaction Hash: ${transactionHash || 'N/A'}
 Issue Description: ${description || 'No description provided.'}`;
 
@@ -30,7 +33,6 @@ Issue Description: ${description || 'No description provided.'}`;
     let isAutoCreated = false;
 
     if (ticketId) {
-      // Retrieve already auto-created ticket
       const checkRes = await this.db.query(
         'SELECT * FROM support_tickets WHERE id = $1',
         [ticketId]
@@ -38,7 +40,6 @@ Issue Description: ${description || 'No description provided.'}`;
       if (checkRes.rows.length > 0) {
         ticket = checkRes.rows[0];
         isAutoCreated = true;
-        // Optionally update the description with user-added context
         await this.db.query(
           'UPDATE support_tickets SET description = $1, updated_at = NOW() WHERE id = $2',
           [`${ticket.description}\n\n${formattedDescription}`, ticketId]
@@ -47,7 +48,6 @@ Issue Description: ${description || 'No description provided.'}`;
     }
 
     if (!ticket) {
-      // Create new ticket using the ticket manager
       ticket = await this.ticketManager.createTicket({
         userWallet: wallet,
         subject: `ESCALATED support request (${resolvedSeverity})`,
@@ -57,7 +57,6 @@ Issue Description: ${description || 'No description provided.'}`;
       });
     }
 
-    // Update status to open or in_progress if needed
     if (ticket.status !== 'open') {
       await this.db.query(
         "UPDATE support_tickets SET status = 'open', updated_at = NOW() WHERE id = $1",
@@ -70,32 +69,34 @@ Issue Description: ${description || 'No description provided.'}`;
       `INSERT INTO support_contacts (ticket_id, email, telegram, discord, twitter, notes, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
       [
-        ticket.id, 
-        email, 
-        telegram || null, 
-        discord || null, 
-        twitter || null, 
-        `Wallet Address: ${walletAddress || wallet}\nTx Hash: ${transactionHash || 'N/A'}`
+        ticket.id,
+        email,
+        telegram || null,
+        discord || null,
+        twitter || null,
+        `Wallet Address: ${effectiveWallet}\nTx Hash: ${transactionHash || 'N/A'}`
       ]
     );
 
-    // 2. Check if ai_analyses already exists for this ticket, if not create it
+    // 2. Create or retrieve ai_analyses entry
     const analysisCheck = await this.db.query(
-      'SELECT id FROM ai_analyses WHERE ticket_id = $1',
+      'SELECT id, root_cause, estimated_resolution FROM ai_analyses WHERE ticket_id = $1',
       [ticket.id]
     );
     let aiAnalysis;
     if (analysisCheck.rows.length === 0) {
-      const suggestedActions = ['Review recent transaction status', 'Examine recipient wallet address'];
-      const rootCause = 'User initiated manual escalation flow';
-      const estimatedResolution = `${slaHours} hours`;
-
       const insertAnalysis = await this.db.query(
-        `INSERT INTO ai_analyses 
+        `INSERT INTO ai_analyses
           (ticket_id, severity, category, confidence, needs_escalation, root_cause, suggested_actions, estimated_resolution, model_used, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
          RETURNING *`,
-        [ticket.id, resolvedSeverity, 'general_question', resolvedConfidence, true, rootCause, suggestedActions, estimatedResolution, 'rule-fallback']
+        [
+          ticket.id, resolvedSeverity, 'general_question', resolvedConfidence, true,
+          'User initiated manual escalation flow',
+          ['Review recent transaction status', 'Examine recipient wallet address'],
+          `${slaHours} hours`,
+          'rule-fallback'
+        ]
       );
       aiAnalysis = insertAnalysis.rows[0];
     } else {
@@ -113,50 +114,87 @@ Issue Description: ${description || 'No description provided.'}`;
     // 4. Update session ticket association if session exists
     if (sessionId) {
       await this.db.query(
-        `UPDATE support_sessions
-         SET ticket_id = $1, status = 'HANDOFF', last_message_at = NOW()
-         WHERE session_id = $2`,
+        `UPDATE support_sessions SET ticket_id = $1, status = 'HANDOFF', last_message_at = NOW() WHERE session_id = $2`,
         [ticket.id, sessionId]
       );
     }
 
-    // 5. Enqueue email notification jobs in emailQueue
-    const ADMIN_EMAIL = process.env.ADMIN_SUPPORT_EMAIL || 'support@pharospay.xyz';
-    
-    // User confirmation email job
-    await emailQueue.add('ticket_confirm', {
-      email,
-      ticket: {
-        id: ticket.id,
-        ticketNumber: ticket.ticket_number,
-        subject: ticket.subject,
-        priority: ticket.priority,
-        status: ticket.status,
-        slaHours
-      }
-    });
+    // 5. Send emails — Redis-resilient (queue → direct fallback)
+    const ADMIN_EMAIL = process.env.ADMIN_SUPPORT_EMAIL || 'cryptishx@gmail.com';
 
-    // Admin alert email job
-    await emailQueue.add('escalation_admin', {
-      adminEmail: ADMIN_EMAIL,
-      ticket: {
-        ticketNumber: ticket.ticket_number,
-        userWallet: ticket.user_wallet,
-        priority: ticket.priority,
-        category: ticket.category,
-        description: description || ticket.description
-      },
-      contactInfo: {
-        email,
-        telegram,
-        discord
-      },
-      aiAnalysis: {
-        confidence: resolvedConfidence,
-        rootCause: aiAnalysis.root_cause || 'User manual request',
-        estimatedResolution: aiAnalysis.estimated_resolution || `${slaHours} hours`
+    const ticketPayload = {
+      id: ticket.id,
+      ticketNumber: ticket.ticket_number,
+      subject: ticket.subject,
+      priority: ticket.priority,
+      status: ticket.status,
+      slaHours
+    };
+
+    const contactInfo = { email, telegram, discord };
+    const analysisInfo = {
+      confidence: resolvedConfidence,
+      rootCause: aiAnalysis.root_cause || 'User manual request',
+      estimatedResolution: aiAnalysis.estimated_resolution || `${slaHours} hours`
+    };
+    const escalationMeta = {
+      walletAddress: effectiveWallet,
+      transactionHash: transactionHash || null,
+      description,
+      sessionId,
+      timestamp: new Date().toISOString()
+    };
+
+    // User confirmation email
+    try {
+      await emailQueue.add('ticket_confirm', { email, ticket: ticketPayload });
+      console.log(`[EscalationEngine] User confirmation email queued for ${email}`);
+    } catch (qErr) {
+      console.warn('[EscalationEngine] Queue unavailable, sending user confirmation directly:', qErr.message);
+      try {
+        await EmailService.sendTicketConfirmation(email, ticketPayload);
+        console.log(`[EscalationEngine] User confirmation email sent directly to ${email}`);
+      } catch (mailErr) {
+        console.error('[EscalationEngine] User email failed completely:', mailErr.message);
       }
-    });
+    }
+
+    // Admin alert to cryptishx@gmail.com
+    try {
+      await emailQueue.add('escalation_admin', {
+        adminEmail: ADMIN_EMAIL,
+        ticket: {
+          ticketNumber: ticket.ticket_number,
+          userWallet: ticket.user_wallet,
+          priority: ticket.priority,
+          category: ticket.category,
+          description: description || ticket.description
+        },
+        contactInfo,
+        aiAnalysis: analysisInfo,
+        escalationMeta
+      });
+      console.log(`[EscalationEngine] Admin alert email queued for ${ADMIN_EMAIL}`);
+    } catch (qErr) {
+      console.warn('[EscalationEngine] Admin email queue unavailable, sending directly:', qErr.message);
+      try {
+        await EmailService.sendEscalationAlert(ADMIN_EMAIL, {
+          ticket: {
+            ticketNumber: ticket.ticket_number,
+            userWallet: ticket.user_wallet,
+            priority: ticket.priority,
+            category: ticket.category,
+            description: description || ticket.description
+          },
+          contactInfo,
+          aiAnalysis: analysisInfo,
+          escalationMeta
+        });
+        console.log(`[EscalationEngine] Admin alert sent directly to ${ADMIN_EMAIL}`);
+      } catch (mailErr) {
+        console.error('[EscalationEngine] Admin email failed completely:', mailErr.message);
+      }
+    }
 
     // Construct reply message
     const confirmMessage = `Your issue has been escalated. Here are your details:
@@ -165,7 +203,7 @@ Ticket ID: ${ticket.ticket_number}
 Severity: ${resolvedSeverity}
 Expected response: within ${slaHours} hour(s)
 
-A detailed report with your conversation history, payment data, and AI analysis has been sent to support@pharospay.xyz.
+A detailed report with your conversation history, payment data, and AI analysis has been sent to ${ADMIN_EMAIL}.
 
 You can track your ticket at: pharospay.xyz/support/tickets/${ticket.id}
 
