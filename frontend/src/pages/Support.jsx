@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { API_BASE } from '../config';
+import { API_BASE, APP_CONFIG } from '../config';
 import { Ic } from '../components/Icons';
 
 // Phase 2 Support Imports
@@ -42,15 +42,15 @@ const STATUS_BADGES = {
 const FAQ_ITEMS = [
   {
     q: 'How do PharosPay payments work?',
-    a: 'PharosPay converts your PROS tokens to local fiat currency (INR, BRL, SGD, etc.) and settles directly to the merchant\'s bank account or mobile wallet using local payment rails like UPI, PIX, PayNow, and ACH.'
+    a: `PharosPay converts your PROS tokens to local fiat currency (INR, BRL, SGD, etc.) and settles directly to the merchant's bank account or mobile wallet using local payment rails like UPI, PIX, PayNow, and ACH.`
   },
   {
     q: 'Why is my payment stuck in "Pending Settlement"?',
     a: 'Settlement typically completes within 30 seconds for instant rails (UPI, PIX). If delayed beyond 5 minutes, check the blockchain confirmation status. The settlement engine retries automatically up to 3 times.'
   },
   {
-    q: 'How is the PROS price determined?',
-    a: 'PROS/USD price is fetched live from the Coinbase Exchange API every 30 seconds. If Coinbase is unreachable and the cached price is older than 5 minutes, payments are blocked to protect you from stale pricing.'
+    q: `How is the PROS price determined?`,
+    a: `PROS/USD price is fetched live from the Coinbase Exchange API every 30 seconds. If Coinbase is unreachable and the cached price is older than 5 minutes, payments are blocked to protect you from stale pricing.`
   },
   {
     q: 'Can I get a receipt for my payment?',
@@ -62,7 +62,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What happens if the blockchain transaction reverts?',
-    a: 'If the on-chain transaction reverts (e.g., due to insufficient PROS balance or gas), the payment will show as "Failed". No fiat settlement is initiated, and no funds are deducted. You can retry the payment.'
+    a: `If the on-chain transaction reverts (e.g., due to insufficient PROS balance or gas), the payment will show as "Failed". No fiat settlement is initiated, and no funds are deducted. You can retry the payment.`
   },
   {
     q: 'How do I become a merchant?',
@@ -70,7 +70,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What fees does PharosPay charge?',
-    a: 'PharosPay charges a small platform fee (visible in the quote breakdown). The fee is deducted from the PROS amount before settlement. There are no hidden charges: the quoted amount is exactly what you pay.'
+    a: `PharosPay charges a small platform fee (visible in the quote breakdown). The fee is deducted from the PROS amount before settlement. There are no hidden charges: the quoted amount is exactly what you pay.`
   }
 ];
 

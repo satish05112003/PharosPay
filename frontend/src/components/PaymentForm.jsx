@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CURRENCIES, API_BASE } from '../config';
+import { CURRENCIES, API_BASE, APP_CONFIG } from '../config';
 
 export default function PaymentForm({ merchantData, onQuoteReady }) {
   const [amount, setAmount] = useState(merchantData.amount || '');
@@ -36,7 +36,7 @@ export default function PaymentForm({ merchantData, onQuoteReady }) {
         const ratesRes = await fetch(`${API_BASE}/rates`);
         const ratesData = await ratesRes.json();
         if (ratesData.success && ratesData.rates) {
-          const prosUsd = ratesData.rates['PROS/USD']?.price || 0.636;
+          const prosUsd = ratesData.rates[`PROS/USD`]?.price || 0.636;
           const fallbackRates = { INR: 83.56, BRL: 5.12, SGD: 1.34, USD: 1.0, GBP: 0.79, EUR: 0.92, THB: 35.2, JPY: 154.5 };
           const fiatRate = ratesData.rates[`USD/${currency}`]?.price || fallbackRates[currency] || 1;
           
@@ -54,8 +54,8 @@ export default function PaymentForm({ merchantData, onQuoteReady }) {
             feeAmount: parseFloat(fee.toFixed(6)),
             feePercent: 2,
             totalPros: parseFloat((merchantPros + fee).toFixed(6)),
-            lastUpdated: ratesData.rates['PROS/USD']?.updatedAt || new Date().toISOString(),
-            source: ratesData.rates['PROS/USD']?.source || 'ExchangeRatesAPI'
+            lastUpdated: ratesData.rates[`${APP_CONFIG.tokenSymbol}/USD`]?.updatedAt || new Date().toISOString(),
+            source: ratesData.rates[`${APP_CONFIG.tokenSymbol}/USD`]?.source || 'ExchangeRatesAPI'
           });
           return;
         }
@@ -164,24 +164,24 @@ export default function PaymentForm({ merchantData, onQuoteReady }) {
               </div>
               <div className="quote-row">
                 <span className="label">Exchange Rate</span>
-                <span className="value">1 PROS ≈ {currencyConfig.symbol}{(quote.fiatAmount / quote.merchantPros).toFixed(2)}</span>
+                <span className="value">1 {APP_CONFIG.tokenSymbol} ≈ {currencyConfig.symbol}{(quote.fiatAmount / quote.merchantPros).toFixed(2)}</span>
               </div>
               <div className="quote-row">
-                <span className="label">PROS Amount</span>
-                <span className="value">{quote.merchantPros} PROS</span>
+                <span className="label">{APP_CONFIG.tokenSymbol} Amount</span>
+                <span className="value">{quote.merchantPros} {APP_CONFIG.tokenSymbol}</span>
               </div>
               <div className="quote-row fee">
                 <span className="label">Platform Fee ({quote.feePercent}%)</span>
-                <span className="value">+{quote.feeAmount} PROS</span>
+                <span className="value">+{quote.feeAmount} {APP_CONFIG.tokenSymbol}</span>
               </div>
               <div className="quote-row total">
                 <span className="label">You Pay</span>
-                <span className="value">{quote.totalPros} PROS</span>
+                <span className="value">{quote.totalPros} {APP_CONFIG.tokenSymbol}</span>
               </div>
             </div>
 
             <button type="submit" className="btn-primary" style={{ marginTop: '16px' }}>
-              <span>Confirm & Pay {quote.totalPros} PROS</span>
+              <span>Confirm & Pay {quote.totalPros} {APP_CONFIG.tokenSymbol}</span>
             </button>
             <button
               type="button"

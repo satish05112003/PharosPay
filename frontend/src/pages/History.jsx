@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACTS, ABI, CURRENCIES } from '../config';
-import { formatPROS, getExplorerTxUrl } from '../hooks/useContract';
+import { CONTRACTS, ABI, CURRENCIES, APP_CONFIG } from '../config';
+import { formatTokenAmount, getExplorerTxUrl } from '../hooks/useContract';
 import { Ic } from '../components/Icons';
 import { usePayments } from '../context/PaymentContext';
 import ReceiptViewer from '../components/ReceiptViewer';
@@ -35,7 +35,7 @@ export default function History({ wallet }) {
   const handleExportCSV = () => {
     if (payments.length === 0) return;
     
-    const headers = ["Date", "Merchant Name", "Merchant ID", "Method", "Amount (fiat)", "Currency", "PROS Paid", "Fee Paid", "Status", "TxHash"];
+    const headers = ["Date", "Merchant Name", "Merchant ID", "Method", "Amount (fiat)", "Currency", `PROS Paid`, "Fee Paid", "Status", "TxHash"];
     const rows = filteredPayments.map(p => [
       p.timestamp.toLocaleString(),
       p.merchantName,
@@ -208,7 +208,7 @@ export default function History({ wallet }) {
           >
             <option value="all">All Status</option>
             <option value="SETTLED">✅ Completed</option>
-            <option value="PROS_LOCKED">⏳ Locked</option>
+            <option value="TOKEN_LOCKED">⏳ Locked</option>
             <option value="SETTLEMENT_PROCESSING">🔄 Processing</option>
             <option value="SETTLEMENT_FAILED">❌ Failed</option>
             <option value="REFUNDED">↩ Refunded</option>

@@ -1,3 +1,5 @@
+import { APP_CONFIG } from '../config';
+
 /**
  * Utility to construct client-side support query templates
  */
@@ -23,7 +25,7 @@ export const getQuickPrompts = (walletState = {}) => {
   ];
 
   if (walletState.hasFailedPayments) {
-    prompts.unshift({ label: 'Report failed payment refund issue', value: 'My payment failed, how do I get my PROS tokens refunded?' });
+    prompts.unshift({ label: 'Report failed payment refund issue', value: `My payment failed, how do I get my PROS tokens refunded?` });
   }
 
   return prompts;

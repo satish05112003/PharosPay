@@ -13,6 +13,7 @@ module.exports = (db) => {
   // ─── POST /api/support/chat ─────────────────────────────────────────────
   router.post('/chat', async (req, res) => {
     try {
+      console.log('[API Route Hit] POST /api/support/chat');
       const { wallet, message, sessionId: clientSessionId } = req.body;
 
       // 1. Validation
@@ -172,8 +173,12 @@ module.exports = (db) => {
 
       // 7. Synchronous Fallback Execution (if Redis is offline or queue enqueuing failed)
       if (!job) {
+        console.log(`[Conversation Loaded] wallet: ${wallet}`);
         const rawContext = await aiSupportService.buildUserContext(wallet);
+        
+        console.log(`[Provider Selected] Preparing to query AI models...`);
         const aiResponse = await aiSupportService.getCompletion(sessionId, wallet, sanitizedMessage, contextText);
+        console.log(`[Provider Response] Answer received from model ${aiResponse.modelUsed || 'unknown'}`);
 
         const SeverityEngine = require('../services/SeverityEngine');
         const TicketManager = require('../services/TicketManager');
@@ -196,6 +201,7 @@ module.exports = (db) => {
            VALUES ($1, $2, $3, 'ai', 'Pharos', $4, NOW())`,
           [aiMessageId, sessionId, wallet, aiResponse.answer]
         );
+        console.log(`[Response Saved] Saved to database successfully.`);
 
         // Save AI analysis details
         await db.query(
@@ -266,6 +272,7 @@ module.exports = (db) => {
           ticketId
         };
 
+        console.log(`[Frontend Response Received] Sending successful payload to client`);
         return res.json({
           success: true,
           sessionId,
@@ -275,8 +282,8 @@ module.exports = (db) => {
       }
 
     } catch (err) {
-      console.error('Support chat handler failed:', err.message);
-      res.status(500).json({ success: false, error: err.message });
+      console.error('[Technical Diagnostics] Support chat handler failed:', err.stack);
+      res.status(500).json({ success: false, error: err.message, stack: err.stack });
     }
   });
 
@@ -389,6 +396,60 @@ module.exports = (db) => {
       }
     } catch (err) {
       console.error('Failed to get support status:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/support/health
+  router.get('/health', (req, res) => {
+    try {
+      const status = AIProvider.getStatus();
+      const onlineModels = status.models ? Object.values(status.models).filter(s => s === 'online').length : 1;
+      return res.json({
+        status: status.enabled ? "online" : "offline",
+        provider: status.provider || "none",
+        fallbacksAvailable: Math.max(0, onlineModels - 1),
+        database: true
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ─── GET /api/support/models ────────────────────────────────────────────
+  router.get('/models', (req, res) => {
+    try {
+      const status = AIProvider.getStatus();
+      if (status.provider === 'openrouter') {
+        const shortNames = {
+          'google/gemini-2.5-flash': 'gemini',
+          'meta-llama/llama-3.3-70b-instruct': 'llama',
+          'deepseek/deepseek-chat-v3-0324': 'deepseek',
+          'qwen/qwen3-235b-a22b': 'qwen',
+          'mistralai/mistral-small-3.1-24b-instruct': 'mistral'
+        };
+
+        const activeModel = status.activeModel;
+        const formattedModels = {};
+        if (status.models) {
+          for (const [full, st] of Object.entries(status.models)) {
+            const key = shortNames[full] || full;
+            formattedModels[key] = st;
+          }
+        }
+        
+        return res.json({
+          activeModel: activeModel,
+          models: formattedModels
+        });
+      } else {
+        return res.json({
+          activeModel: status.model,
+          models: { default: 'online' }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to get models status:', err.message);
       res.status(500).json({ success: false, error: err.message });
     }
   });

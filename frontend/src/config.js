@@ -16,16 +16,45 @@ export const PHAROS_CHAIN = {
 };
 
 // ─── Contract Addresses ──────────────────────────────────────────────────
-// ⚠️ Replace these after running DeployPharosPay.s.sol
 export const CONTRACTS = {
-  MockPROS: '0x3E29AF7126051dC75B003fA10c4a9A315f2200C4',        // Deployed MockPROS Address
-  PriceOracle: '0xe2eD0C7c82195BC462A976dB198d973d395D9805',     // Deployed PriceOracle Address
-  FeeVault: '0x22F9D0109f43BB00b784147852fc0EA06bF5af82',        // Deployed FeeVault Address
-  PharosPayRouter: '0x7c1B6eeCCb881dA5EBA50Ec1e7202B0De76E11A0', // Latest deployed PharosPayRouter Address
+  MockPROS: '0x3E29AF7126051dC75B003fA10c4a9A315f2200C4',
+  PriceOracle: '0xe2eD0C7c82195BC462A976dB198d973d395D9805',
+  FeeVault: '0x22F9D0109f43BB00b784147852fc0EA06bF5af82',
+  PharosPayRouter: '0x7c1B6eeCCb881dA5EBA50Ec1e7202B0De76E11A0',
+};
+
+// ─── App Level Configurations ─────────────────────────────────────────────
+export const APP_CONFIG = {
+  tokenSymbol: 'PROS'
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────
 export const API_BASE = 'http://localhost:3001/api';
+
+export async function initializeConfig() {
+  try {
+    const res = await fetch(API_BASE + '/config/network');
+    const data = await res.json();
+    if (data.success && data.network) {
+      PHAROS_CHAIN.chainIdDecimal = Number(data.network.chainId);
+      PHAROS_CHAIN.chainId = '0x' + PHAROS_CHAIN.chainIdDecimal.toString(16);
+      PHAROS_CHAIN.chainName = data.network.name;
+      PHAROS_CHAIN.nativeCurrency.symbol = data.network.tokenSymbol;
+      PHAROS_CHAIN.nativeCurrency.name = data.network.tokenName;
+      PHAROS_CHAIN.rpcUrls = [data.network.rpcUrl];
+      PHAROS_CHAIN.blockExplorerUrls = [data.network.explorerUrl];
+      
+      if (data.payment) {
+        CONTRACTS.MockPROS = data.payment.tokenAddress;
+        APP_CONFIG.tokenSymbol = data.payment.tokenSymbol;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to initialize dynamic network configuration', err);
+  }
+}
+
+
 
 // ─── ABIs (minimal | only functions used by frontend) ─────────────────────
 export const ABI = {

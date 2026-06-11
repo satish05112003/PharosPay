@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { truncateAddress, getExplorerAddressUrl } from '../hooks/useContract';
 import { Ic } from '../components/Icons';
-import { API_BASE } from '../config';
+import { API_BASE, APP_CONFIG } from '../config';
 
 export default function Wallet({ wallet }) {
   const [copied, setCopied] = useState(false);
-  const [prosPrice, setProsPrice] = useState(0.636);
+  const [tokenPrice, setTokenPrice] = useState(0.636);
 
   useEffect(() => {
     const fetchRates = async () => {
       try {
         const res = await fetch(`${API_BASE}/rates`);
         const data = await res.json();
-        if (data.success && data.rates && data.rates['PROS/USD']) {
-          setProsPrice(data.rates['PROS/USD'].price);
+        const pair = `PROS/USD`;
+        if (data.success && data.rates && data.rates[pair]) {
+          setTokenPrice(data.rates[pair].price);
         }
       } catch (err) {
         console.warn("Wallet: Failed to fetch live rates:", err.message);
@@ -83,7 +84,7 @@ export default function Wallet({ wallet }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                 <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 700 }}>PROS BALANCE</span>
                 <span style={{ fontSize: "15px", fontWeight: 800, color: "var(--text)" }}>
-                  {wallet.prosBalance} PROS
+                  {wallet.tokenBalance} PROS
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -97,7 +98,7 @@ export default function Wallet({ wallet }) {
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
               <span style={{ color: "var(--text-secondary)" }}>USD Value:</span>
               <strong style={{ color: "var(--primary)" }}>
-                ≈ ${(parseFloat(wallet.prosBalance || 0) * prosPrice).toFixed(2)} USD
+                ≈ ${(parseFloat(wallet.tokenBalance || 0) * tokenPrice).toFixed(2)} USD
               </strong>
             </div>
           </div>

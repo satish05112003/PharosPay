@@ -1,5 +1,6 @@
 import React from 'react';
 import './support.css';
+import { APP_CONFIG } from '../../config';
 
 const QUICK_SUGGESTIONS = [
   {
@@ -35,8 +36,8 @@ const QUICK_SUGGESTIONS = [
   {
     icon: '⛓️',
     title: 'Pharos Ecosystem',
-    desc: 'Learn about Pharos blockchain, PROS tokens, and DeFi',
-    query: 'Tell me about the Pharos ecosystem and how PROS tokens work.',
+    desc: `Learn about Pharos blockchain, PROS tokens, and DeFi`,
+    query: `Tell me about the Pharos ecosystem and how PROS tokens work.`,
   },
   {
     icon: '🛠️',
@@ -46,9 +47,9 @@ const QUICK_SUGGESTIONS = [
   },
   {
     icon: '📈',
-    title: 'PROS Exchange Rate',
-    desc: 'Current rates, price history, and conversion quotes',
-    query: 'What is the current PROS/USD rate and how is it calculated?',
+    title: `PROS Exchange Rate`,
+    desc: `Check how live prices are calculated`,
+    query: `What is the current PROS/USD rate and how is it calculated?`,
   },
 ];
 

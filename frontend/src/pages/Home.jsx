@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePayments } from '../context/PaymentContext';
-import { CURRENCIES, API_BASE } from '../config';
+import { CURRENCIES, API_BASE, APP_CONFIG } from '../config';
 import { Ic } from '../components/Icons';
 import ReceiptViewer from '../components/ReceiptViewer';
 
@@ -39,7 +39,7 @@ export default function Home({ wallet }) {
   const [greeting, setGreeting] = useState(getGreeting());
   const [dateTime, setDateTime] = useState(getFormattedDateTime());
   const [hoveredPoint, setHoveredPoint] = useState(null);
-  const [prosPrice, setProsPrice] = useState(0.636);
+  const [tokenPrice, setTokenPrice] = useState(0.636);
 
   const [clickCount, setClickCount] = useState(0);
   const [showDebug, setShowDebug] = useState(false);
@@ -61,8 +61,9 @@ export default function Home({ wallet }) {
       try {
         const res = await fetch(`${API_BASE}/rates`);
         const data = await res.json();
-        if (data.success && data.rates && data.rates['PROS/USD']) {
-          setProsPrice(data.rates['PROS/USD'].price);
+        const pair = `PROS/USD`;
+        if (data.success && data.rates && data.rates[pair]) {
+          setTokenPrice(data.rates[pair].price);
         }
       } catch (err) {
         console.warn("Home: Failed to fetch live rates:", err.message);
@@ -237,7 +238,7 @@ export default function Home({ wallet }) {
 
   const statsItems = [
     { label: "Total Payments", value: wallet.isConnected ? userPaymentCount.toString() : "0", sub: `${globalStats.paymentCount} globally`, icon: "send", color: "#2563eb" },
-    { label: "Total Volume", value: wallet.isConnected ? `${userVolPROS.toFixed(1)} PROS` : "0.0 PROS", sub: wallet.isConnected ? `≈ $${userVolUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD` : `${parseFloat(globalStats.volume).toFixed(1)} PROS globally`, icon: "zap", color: "#10b981" },
+    { label: "Total Volume", value: wallet.isConnected ? `${userVolPROS.toFixed(1)} PROS` : `0.0 PROS`, sub: wallet.isConnected ? `≈ $${userVolUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD` : `${parseFloat(globalStats.volume).toFixed(1)} PROS globally`, icon: "zap", color: "#10b981" },
     { label: "Platform Fees", value: wallet.isConnected ? `$${userFeesUSD.toFixed(2)} USD` : "$0.00 USD", sub: "Based on execution rates", icon: "shield", color: "#8b5cf6" },
     { label: "Active Network", value: wallet.isConnected ? "Pharos Atlantic" : "Offline", sub: wallet.isConnected ? "Chain ID: 688689" : "Connect MetaMask", icon: "globe", color: "#f59e0b" }
   ];

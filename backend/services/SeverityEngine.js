@@ -19,7 +19,7 @@ class SeverityEngine {
       'drained', 'compromised', 'scam', 'fraud detected', 'private key',
       'seed phrase', 'large amount', 'thousands', 'lakhs', 'crores',
       'lost funds', 'stolen funds', 'wrong transfer', 'wrong address',
-      'accidentally sent', 'lost $', 'lost pros', 'stolen pros', 'stolen assets'
+      'accidentally sent', 'lost $', 'lost tokens', 'stolen tokens', 'stolen assets'
     ];
 
     const highKeywords = [

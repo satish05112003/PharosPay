@@ -15,7 +15,8 @@ class ReceiptVerificationService {
       pharosId:    receipt.payment.pharosPaymentId,
       fiatAmount:  receipt.amounts.fiatAmount,
       fiatCurrency: receipt.amounts.fiatCurrency,
-      prosAmount:  receipt.amounts.prosAmount,
+      tokenAmount:  receipt.amounts.tokenAmount,
+      tokenSymbol: receipt.amounts.tokenSymbol,
       utr:         receipt.settlement.utr,
       createdAt:   receipt.payment.createdAt
     });
@@ -44,7 +45,8 @@ class ReceiptVerificationService {
         pharosId:    receipt.payment.pharosPaymentId,
         fiatAmount:  receipt.amounts.fiatAmount,
         fiatCurrency: receipt.amounts.fiatCurrency,
-        prosAmount:  receipt.amounts.prosAmount,
+        tokenAmount:  receipt.amounts.tokenAmount,
+        tokenSymbol: receipt.amounts.tokenSymbol,
         utr:         receipt.settlement.utr,
         createdAt:   receipt.payment.createdAt
       });
@@ -165,7 +167,8 @@ class ReceiptVerificationService {
         amounts: {
           fiatAmount: rawReceipt.paymentDetails.fiatAmount,
           fiatCurrency: rawReceipt.paymentDetails.fiatCurrency,
-          prosAmount: rawReceipt.paymentDetails.prosAmount
+          tokenAmount: rawReceipt.paymentDetails.tokenAmount,
+          tokenSymbol: rawReceipt.paymentDetails.tokenSymbol
         },
         settlement: {
           utr: rawReceipt.utr,

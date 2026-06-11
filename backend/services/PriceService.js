@@ -1,4 +1,5 @@
 const { ethers } = require('ethers');
+const networkConfigService = require('./NetworkConfigService');
 
 const ORACLE_ABI = [
   'function getPrice(string pair) view returns (uint256 price, uint256 updatedAt)',
@@ -11,9 +12,13 @@ class PriceService {
     this.wallet = null;
     this.oracleWritable = null;
 
-    const rpcUrl = process.env.RPC_URL || 'https://atlantic.dplabs-internal.com';
-    const oracleAddr = process.env.PRICE_ORACLE;
+    const config = networkConfigService.getActiveConfig();
+    const rpcUrl = config.rpcUrl;
+    const oracleAddr = config.contracts.oracle;
     const operatorKey = process.env.PHAROS_OPERATOR_PRIVATE_KEY;
+    
+    this.tokenSymbol = networkConfigService.getPaymentToken().symbol;
+    this.tokenPair = `${this.tokenSymbol}/USD`;
 
     if (oracleAddr) {
       try {
@@ -36,7 +41,7 @@ class PriceService {
 
     // Cache to hold last valid prices
     this.cache = {
-      'PROS/USD': { price: 0.6360, updatedAt: Date.now(), source: 'Cached (Initial)', status: 'initial' },
+      [this.tokenPair]: { price: 0.6360, updatedAt: Date.now(), source: 'Cached (Initial)', status: 'initial' },
       'USD/INR': { price: 83.58, updatedAt: Date.now(), source: 'Cached (Initial)', status: 'initial' },
       'USD/BRL': { price: 5.12, updatedAt: Date.now(), source: 'Cached (Initial)', status: 'initial' },
       'USD/SGD': { price: 1.34, updatedAt: Date.now(), source: 'Cached (Initial)', status: 'initial' },
@@ -63,7 +68,7 @@ class PriceService {
     }
   }
 
-  async fetchProsUsdPrice() {
+  async fetchTokenUsdPrice() {
     // 1. Coinbase Exchange API (Primary source of truth for live price)
     try {
       const res = await fetch('https://api.exchange.coinbase.com/products/PROS-USD/ticker', {
@@ -85,7 +90,7 @@ class PriceService {
       console.warn('PriceService: Coinbase query failed, checking fallbacks:', e.message);
       
       // 2. Cache fallback
-      const cached = this.cache['PROS/USD'];
+      const cached = this.cache[this.tokenPair];
       const cacheAgeMs = Date.now() - (cached ? cached.updatedAt : 0);
       const staleLimitMs = (parseInt(process.env.PRICE_STALE_LIMIT) || 300) * 1000;
       
@@ -102,14 +107,14 @@ class PriceService {
       // 3. Oracle fallback (Last resort)
       if (this.oracle) {
         try {
-          console.warn('PriceService: Attempting on-chain oracle fallback query for PROS/USD...');
-          const [price, updatedAt] = await this.oracle.getPrice('PROS/USD');
+          console.warn(`PriceService: Attempting on-chain oracle fallback query for ${this.tokenPair}...`);
+          const [price, updatedAt] = await this.oracle.getPrice(this.tokenPair);
           const priceNum = Number(price) / 1e8;
           if (priceNum > 0) {
             return { price: priceNum, source: 'PharosOracle', updatedAt: Number(updatedAt) * 1000, status: 'fallback' };
           }
         } catch (oracleErr) {
-          console.error('PriceService: Oracle fallback query failed for PROS/USD:', oracleErr.message);
+          console.error(`PriceService: Oracle fallback query failed for ${this.tokenPair}:`, oracleErr.message);
         }
       }
       
@@ -165,16 +170,16 @@ class PriceService {
     }
   }
 
-  async getProsUsdPrice() {
-    const cached = this.cache['PROS/USD'];
+  async getTokenUsdPrice() {
+    const cached = this.cache[this.tokenPair];
     const cacheTtlMs = (parseInt(process.env.PRICE_CACHE_SECONDS) || 30) * 1000;
 
     if (cached && (Date.now() - cached.updatedAt < cacheTtlMs) && cached.status === 'ok') {
       return cached.price;
     }
 
-    const fresh = await this.fetchProsUsdPrice();
-    this.cache['PROS/USD'] = fresh;
+    const fresh = await this.fetchTokenUsdPrice();
+    this.cache[this.tokenPair] = fresh;
     return fresh.price;
   }
 
@@ -214,15 +219,15 @@ class PriceService {
   }
 
   async getRateDetails(pair) {
-    if (pair === 'PROS/USD') {
-      const cached = this.cache['PROS/USD'];
+    if (pair === this.tokenPair || pair === 'PROS/USD') {
+      const cached = this.cache[this.tokenPair];
       const cacheTtlMs = (parseInt(process.env.PRICE_CACHE_SECONDS) || 30) * 1000;
 
       if (cached && (Date.now() - cached.updatedAt < cacheTtlMs) && cached.status === 'ok') {
         return cached;
       }
-      const fresh = await this.fetchProsUsdPrice();
-      this.cache['PROS/USD'] = fresh;
+      const fresh = await this.fetchTokenUsdPrice();
+      this.cache[this.tokenPair] = fresh;
       return fresh;
     }
 
@@ -243,8 +248,8 @@ class PriceService {
   }
 
   getDebugInfo() {
-    const prosCache = this.cache['PROS/USD'] || {};
-    const ageSeconds = Math.round((Date.now() - prosCache.updatedAt) / 1000);
+    const tokenCache = this.cache[this.tokenPair] || {};
+    const ageSeconds = Math.round((Date.now() - tokenCache.updatedAt) / 1000);
     const ttl = parseInt(process.env.PRICE_CACHE_SECONDS) || 30;
     
     let coinbaseStatus = 'Online';
@@ -253,11 +258,11 @@ class PriceService {
     }
 
     return {
-      price: prosCache.price,
+      price: tokenCache.price,
       source: 'Coinbase',
       coinbaseStatus,
       ageSeconds,
-      updatedAt: prosCache.updatedAt,
+      updatedAt: tokenCache.updatedAt,
       staleLimitSeconds: parseInt(process.env.PRICE_STALE_LIMIT) || 300,
       cacheTtlSeconds: ttl
     };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACTS, ABI, CURRENCIES, API_BASE } from '../config';
+import { CONTRACTS, ABI, CURRENCIES, API_BASE, APP_CONFIG } from '../config';
 
 export default function ConfirmPayment({ paymentData, wallet, onSuccess, onError }) {
   const [status, setStatus] = useState('idle'); // idle | approving | paying | confirming | settled | failed
@@ -120,16 +120,16 @@ export default function ConfirmPayment({ paymentData, wallet, onSuccess, onError
             <span className="value">{paymentData.paymentRail} {currencyConfig.flag}</span>
           </div>
           <div className="quote-row">
-            <span className="label">PROS Amount</span>
-            <span className="value">{paymentData.quote.merchantPros} PROS</span>
+            <span className="label">{APP_CONFIG.tokenSymbol} Amount</span>
+            <span className="value">{paymentData.quote.merchantPros} {APP_CONFIG.tokenSymbol}</span>
           </div>
           <div className="quote-row fee">
             <span className="label">Platform Fee ({paymentData.quote.feePercent}%)</span>
-            <span className="value">+{paymentData.quote.feeAmount} PROS</span>
+            <span className="value">+{paymentData.quote.feeAmount} {APP_CONFIG.tokenSymbol}</span>
           </div>
           <div className="quote-row total">
             <span className="label">Total Deduction</span>
-            <span className="value">{paymentData.quote.totalPros} PROS</span>
+            <span className="value">{paymentData.quote.totalPros} {APP_CONFIG.tokenSymbol}</span>
           </div>
         </div>
 
@@ -137,7 +137,7 @@ export default function ConfirmPayment({ paymentData, wallet, onSuccess, onError
         {status === 'idle' && (
           <>
             <button className="btn-primary" onClick={executePayment} style={{ marginTop: '16px' }}>
-              <span>🔐 Pay {paymentData.quote.totalPros} PROS</span>
+              <span>🔐 Pay {paymentData.quote.totalPros} {APP_CONFIG.tokenSymbol}</span>
             </button>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
               MetaMask will ask for approval, then payment confirmation
@@ -149,7 +149,7 @@ export default function ConfirmPayment({ paymentData, wallet, onSuccess, onError
         {status === 'approving' && (
           <div style={{ textAlign: 'center', padding: '16px' }}>
             <div className="spinner" style={{ margin: '0 auto 12px' }} />
-            <p style={{ color: 'var(--pharos-light)' }}>Approving PROS spending...</p>
+            <p style={{ color: 'var(--pharos-light)' }}>Approving {APP_CONFIG.tokenSymbol} spending...</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Confirm in MetaMask</p>
           </div>
         )}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { truncateAddress, getExplorerAddressUrl } from '../hooks/useContract';
+import { APP_CONFIG } from '../config';
 import { Ic } from './Icons';
 
 export default function WalletButton({ wallet, isSidebar = false }) {
-  const { address, prosBalance, isConnected, isConnecting, isCorrectNetwork, connect, switchNetwork, disconnect } = wallet;
+  const { address, tokenBalance, isConnected, isConnecting, isCorrectNetwork, connect, switchNetwork, disconnect } = wallet;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropdownRef = useRef(null);
@@ -119,7 +120,7 @@ export default function WalletButton({ wallet, isSidebar = false }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
           <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>Balance</span>
           <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--primary)' }}>
-            {parseFloat(prosBalance).toFixed(2)} PROS
+            {parseFloat(tokenBalance).toFixed(2)} PROS
           </span>
         </div>
 
@@ -234,7 +235,7 @@ export default function WalletButton({ wallet, isSidebar = false }) {
         }} />
         <span style={{ fontWeight: 600 }}>{truncateAddress(address)}</span>
         <span style={{ opacity: 0.15 }}>|</span>
-        <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{parseFloat(prosBalance).toFixed(2)} PROS</span>
+        <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{parseFloat(tokenBalance).toFixed(2)} PROS</span>
       </button>
 
       {dropdownOpen && (

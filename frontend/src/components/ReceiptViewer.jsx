@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { API_BASE, APP_CONFIG } from '../config';
 import { Ic } from './Icons';
 
 export default function ReceiptViewer({ payment, onClose }) {
@@ -312,7 +312,7 @@ export default function ReceiptViewer({ payment, onClose }) {
                   { label: receipt.utrLabel || 'Bank UTR', value: receipt.utr || 'N/A', mono: true },
                   { label: 'Base Fiat Amount', value: `${Number(receipt.paymentDetails.fiatAmount).toFixed(2)} ${receipt.paymentDetails.fiatCurrency}` },
                   { label: 'Platform Fee (2.0%)', value: `${(Number(receipt.paymentDetails.fiatAmount) * 0.02).toFixed(2)} ${receipt.paymentDetails.fiatCurrency}` },
-                  { label: 'PROS/USD Price', value: receipt.paymentDetails.prosPriceAtExecution ? `$${Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4)}` : 'Execution data unavailable' },
+                  { label: `PROS/USD Price`, value: receipt.paymentDetails.prosPriceAtExecution ? `$${Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4)}` : 'Execution data unavailable' },
                   { label: 'Exchange Rate', value: receipt.paymentDetails.fxRateAtExecution ? `${Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4)} (USD/${receipt.paymentDetails.fiatCurrency})` : 'Execution data unavailable' },
                   { label: 'Oracle Source', value: receipt.paymentDetails.priceSource || 'Coinbase' },
                   { label: 'Date Issued', value: new Date(receipt.paymentDetails.timestamp).toLocaleString() },

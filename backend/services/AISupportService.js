@@ -68,7 +68,7 @@ class AISupportService {
       `SELECT p.id as payment_id, p.fiat_amount, p.fiat_currency, p.merchant_identifier, p.status
        FROM payments p
        WHERE LOWER(p.user_wallet) = LOWER($1)
-         AND p.status IN ('PROS_LOCKED', 'SETTLEMENT_STARTED', 'SETTLEMENT_PROCESSING')
+         AND p.status IN ('TOKEN_LOCKED', 'SETTLEMENT_STARTED', 'SETTLEMENT_PROCESSING')
        ORDER BY p.created_at DESC LIMIT 10`,
       [wallet]
     );
@@ -257,7 +257,7 @@ class AISupportService {
     }
     if (lower.includes('refund')) {
       return {
-        answer: 'If your payment failed, your PROS tokens are automatically refunded to your wallet within 60 seconds. If you have not received the refund after 5 minutes, please escalate this to our team.',
+        answer: 'If your payment failed, your tokens are automatically refunded to your wallet within 60 seconds. If you have not received the refund after 5 minutes, please escalate this to our team.',
         severity: 'HIGH',
         category: 'refund_request',
         confidence: 1.0,
@@ -271,7 +271,7 @@ class AISupportService {
     }
     if (lower.includes('failed') || lower.includes('error')) {
       return {
-        answer: 'Payment failures are usually caused by incorrect merchant identifiers or temporary settlement partner outages. Your PROS tokens will be automatically refunded if the payment did not complete. Please check your wallet balance.',
+        answer: 'Payment failures are usually caused by incorrect merchant identifiers or temporary settlement partner outages. Your tokens will be automatically refunded if the payment did not complete. Please check your wallet balance.',
         severity: 'HIGH',
         category: 'failed_payment',
         confidence: 1.0,
@@ -283,6 +283,23 @@ class AISupportService {
         processingMs: 1
       };
     }
+    const knowledgeMatches = PharosKnowledgeService.search(message);
+    if (knowledgeMatches && knowledgeMatches.length > 0) {
+      const bestMatch = knowledgeMatches[0];
+      return {
+        answer: `[Local Knowledge Base]\n${bestMatch.content}\n\nFor more details, see: ${bestMatch.links ? bestMatch.links.join(', ') : 'our documentation.'}`,
+        severity: 'LOW',
+        category: bestMatch.category || 'general_question',
+        confidence: 0.9,
+        needsEscalation: false,
+        escalationReason: null,
+        suggestedActions: ['Review documentation'],
+        relatedPayments: [],
+        modelUsed: 'KeywordFallback',
+        processingMs: 1
+      };
+    }
+
     return {
       answer: 'I apologize, the AI assistant is temporarily unavailable. Please try again in a moment, or click "Escalate to Human" if your issue is urgent.',
       severity: 'MEDIUM',
@@ -422,7 +439,19 @@ class AISupportService {
    * Main completion call linking history, AIProvider, and retries
    */
   async getCompletion(sessionId, wallet, message, contextText) {
+    console.log(`[Support Request] wallet: ${wallet}, message: "${message}"`);
     const startTime = Date.now();
+    
+    // Greeting shortcuts check
+    const lowerMsg = message.toLowerCase().trim();
+    if (['hello', 'hi', 'hey', 'good morning', 'good evening', 'gm', 'gn', 'sup', 'yo'].includes(lowerMsg)) {
+      return {
+        answer: "Hello! I'm the PharosPay Support Assistant. How can I help you today with payments, receipts, settlements, wallets, or Pharos-related questions?",
+        modelUsed: "LocalGreeting",
+        processingMs: Date.now() - startTime
+      };
+    }
+
     const historyKey = `support:session:${sessionId}:history`;
 
     // 1. Always query database for fresh user context to prevent stale cache
@@ -545,14 +574,15 @@ class AISupportService {
     } catch (err) {
       console.error('[AISupportService] Failed to load history from database:', err.message);
     }
+    console.log('[Context Loaded]');
 
-    // 4. Fetch live PROS price data for injection into system prompt
+    // 4. Fetch live token price data for injection into system prompt
     let livePriceData = null;
     try {
       const priceRes = await this.db.query(
-        `SELECT pros_price_at_execution, fx_rate_at_execution, fiat_currency, fiat_amount, pros_amount_executed as pros_amount, price_source, created_at
+        `SELECT token_price_at_execution, fx_rate_at_execution, fiat_currency, fiat_amount, token_amount_executed as token_amount, token_symbol, price_source, created_at
          FROM payments
-         WHERE pros_price_at_execution IS NOT NULL AND pros_price_at_execution > 0
+         WHERE token_price_at_execution IS NOT NULL AND token_price_at_execution > 0
          ORDER BY created_at DESC LIMIT 1`
       );
       if (priceRes.rows.length > 0) {
@@ -571,7 +601,7 @@ class AISupportService {
 
     // Price/ecosystem questions always allowed
     const lower = message.toLowerCase();
-    const isPriceQuery = /\b(price|rate|cost|worth|value|how much|pros.+usd|usd.+pros|conversion|exchange|convert|quote|current|live|market)\b/i.test(lower);
+    const isPriceQuery = /\b(price|rate|cost|worth|value|how much|usd|conversion|exchange|convert|quote|current|live|market)\b/i.test(lower);
     const isPharosEcosystem = /\b(pharos|pros|atlantic|testnet|mainnet|explorer|pharosscan|router|oracle|contract|ca|blockchain|roadmap|ecosystem|token|layer.?1|l1|defi|rwa)\b/i.test(lower);
 
     // Decision logic — VERY permissive for Pharos/payment topics:
@@ -629,21 +659,22 @@ class AISupportService {
     // Build live price section for system prompt
     let livePriceSection = '';
     if (livePriceData) {
-      const prosPrice = Number(livePriceData.pros_price_at_execution).toFixed(4);
+      const tokenSymbol = livePriceData.token_symbol || 'PROS';
+      const tokenPrice = Number(livePriceData.token_price_at_execution).toFixed(4);
       const fxRate = livePriceData.fx_rate_at_execution ? Number(livePriceData.fx_rate_at_execution).toFixed(4) : null;
       const currency = livePriceData.fiat_currency || 'INR';
       const src = livePriceData.price_source || 'Coinbase';
       const updatedAt = livePriceData.created_at ? new Date(livePriceData.created_at).toLocaleString() : 'recently';
       livePriceSection = `
---- LIVE PROS PRICE DATA (use this when user asks about price) ---
-Current PROS/USD Price: $${prosPrice}
+--- LIVE TOKEN PRICE DATA (use this when user asks about price) ---
+Current ${tokenSymbol}/USD Price: $${tokenPrice}
 Price Source: ${src}
 ${fxRate ? `FX Rate: 1 USD = ${fxRate} ${currency}` : ''}
 Last known execution: ${updatedAt}
 
 Example calculation for user reference:
-- To pay ${currency === 'INR' ? '₹100' : '100 ' + currency}: divide by FX rate to get USD, then divide by PROS price
-${fxRate ? `- ₹100 = $${(100 / Number(fxRate)).toFixed(4)} USD = ${(100 / Number(fxRate) / Number(livePriceData.pros_price_at_execution)).toFixed(4)} PROS` : ''}
+- To pay ${currency === 'INR' ? '₹100' : '100 ' + currency}: divide by FX rate to get USD, then divide by ${tokenSymbol} price
+${fxRate ? `- ₹100 = $${(100 / Number(fxRate)).toFixed(4)} USD = ${(100 / Number(fxRate) / Number(livePriceData.token_price_at_execution)).toFixed(4)} ${tokenSymbol}` : ''}
 -------------------------------------------------------------------`;
     }
 
@@ -651,20 +682,20 @@ ${fxRate ? `- ₹100 = $${(100 / Number(fxRate)).toFixed(4)} USD = ${(100 / Numb
 
 IDENTITY:
 - You are the official PharosPay AI support agent.
-- You answer ALL questions about PharosPay, Pharos blockchain, PROS tokens, payments, settlements, wallets, receipts, and the broader ecosystem.
-- When asked who you are: "I'm the PharosPay Support Assistant. I can help with payments, settlements, wallet issues, PROS pricing, receipts, and all things Pharos."
+- You answer ALL questions about PharosPay, Pharos blockchain, tokens, payments, settlements, wallets, receipts, and the broader ecosystem.
+- When asked who you are: "I'm the PharosPay Support Assistant. I can help with payments, settlements, wallet issues, pricing, receipts, and all things Pharos."
 
 ANSWER ALL PHAROS ECOSYSTEM QUESTIONS:
 You MUST answer (never refuse) questions like:
-- "What is PROS price?" — Use the live price data above.
+- "What is the token price?" — Use the live price data above.
 - "What is Pharos?" — Pharos is a high-performance EVM-compatible Layer 1 blockchain.
 - "What is PharosPay?" — Explain the crypto-to-fiat payment protocol.
 - "What is the Atlantic Testnet?" — Chain ID 688689, RPC https://atlantic.dplabs-internal.com
 - "What is the Router Contract?" — 0x7c1B6eeCCb881dA5EBA50Ec1e7202B0De76E11A0
 - "What is the Price Oracle CA?" — 0xe2eD0C7c82195BC462A976dB198d973d395D9805
-- "How do settlements work?" — PROS locked on-chain, fiat sent to merchant via UPI/PIX/etc.
+- "How do settlements work?" — Tokens locked on-chain, fiat sent to merchant via UPI/PIX/etc.
 - "How do receipts work?" — Cryptographic HMAC-SHA256 receipts, downloadable as PDF.
-- "How does the oracle work?" — Fetches PROS/USD price from Coinbase every 30 seconds.
+- "How does the oracle work?" — Fetches prices from Coinbase every 30 seconds.
 - "What is the explorer?" — PharosScan at https://pharosscan.xyz/
 
 CONVERSATION RULES:
@@ -679,7 +710,8 @@ CONVERSATION RULES:
 
 PHAROS KNOWLEDGE:
 - Pharos: High-performance EVM L1 blockchain, sub-second finality, near-zero gas fees.
-- PharosPay: Converts PROS tokens to fiat (INR, BRL, SGD, USD, EUR) via UPI, PIX, PayNow, ACH, SEPA.
+- PharosPay: Converts tokens to fiat (INR, BRL, SGD, USD, EUR) via UPI, PIX, PayNow, ACH, SEPA.
+- Network gas token: PHRS. Payment settlement token: PROS.
 - Official Website: https://www.pharos.xyz/
 - Documentation: https://docs.pharos.xyz/
 - Explorer: https://pharosscan.xyz/
@@ -693,7 +725,7 @@ SUPPORT CAPABILITIES:
 - Receipt finding and verification
 - Wallet connection help, MetaMask setup
 - Merchant onboarding questions
-- PROS price and conversion questions
+- Token price and conversion questions
 - Pharos ecosystem, roadmap, and technical questions
 - Ticket escalation for critical issues
 
@@ -743,7 +775,17 @@ ${conversationSummary ? '\n' + conversationSummary + '\n' : ''}`;
     }
 
     try {
-      const aiResponse = await AIProvider.getCompletion(conversationHistory);
+      let aiResponse;
+      try {
+        aiResponse = await AIProvider.getCompletion(conversationHistory);
+      } catch (err) {
+        if (err.message === 'ALL_MODELS_FAILED' || err.message.includes('AI provider failed')) {
+          console.warn('[Knowledge Fallback] All models failed. Falling back to local knowledge engine.');
+          const fb = this.keywordFallback(message);
+          return fb;
+        }
+        throw err;
+      }
 
       // Anti-repetition check against recent AI messages
       const recentAiMessages = dbMessages
@@ -806,8 +848,9 @@ ${conversationSummary ? '\n' + conversationSummary + '\n' : ''}`;
             })
           ]
         );
+        console.log('[Response Saved]');
       } catch (err) {
-        console.error('Failed to write audit log:', err.message);
+        console.error('[Database Save Failed]', err.message);
       }
 
       return {

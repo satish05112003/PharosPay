@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const priceService = require('../services/PriceService');
+const networkConfigService = require('../services/NetworkConfigService');
 const { RAIL_MAP } = require('../lib/qrParser');
 
 /**
  * GET /api/quote
- * Get a PROS conversion quote for a fiat amount.
+ * Get a token conversion quote for a fiat amount.
  * 
  * Query: ?amount=100&currency=INR&feeRate=200
- * Response: { success: true, quote: { fiatAmount, totalPros, feeAmount, ... } }
+ * Response: { success: true, quote: { fiatAmount, totalToken, feeAmount, ... } }
  */
 router.get('/quote', async (req, res) => {
   try {
@@ -38,41 +39,44 @@ router.get('/quote', async (req, res) => {
       });
     }
 
-    const prosDetails = await priceService.getRateDetails('PROS/USD');
-    const fiatDetails = await priceService.getRateDetails(railInfo.fiatPair);
+    const paymentToken = networkConfigService.getPaymentToken();
+    const tokenSymbol = paymentToken.symbol;
+    const tokenPair = `${tokenSymbol}/USD`;
 
-    const liveProsPrice = prosDetails.price;
-    const liveFxRate = fiatDetails.price;
+    const tokenDetails = await priceService.getRateDetails(tokenPair);
+    const liveFxRate = await priceService.getRateValue(currency);
+
+    const liveTokenPrice = tokenDetails.price;
 
     // Trigger on-chain PriceOracle update in the background to ensure parity
-    priceService.syncOracle(['PROS/USD', railInfo.fiatPair], [liveProsPrice, liveFxRate]).catch(err => {
+    priceService.syncOracle([tokenPair, railInfo.fiatPair], [liveTokenPrice, liveFxRate]).catch(err => {
       console.error('Quote Route: Failed to update oracle in background:', err.message);
     });
 
     const usdAmount = amount / liveFxRate;
-    const prosAmount = usdAmount / liveProsPrice;
-    const feeAmount = prosAmount * (feeRate / 10000);
-    const totalPros = prosAmount + feeAmount;
+    const tokenAmount = usdAmount / liveTokenPrice;
+    const feeAmount = tokenAmount * (feeRate / 10000);
+    const totalToken = tokenAmount + feeAmount;
 
     const quote = {
       fiatAmount: amount,
       fiatCurrency: currency,
       usdAmount: parseFloat(usdAmount.toFixed(6)),
-      prosPrice: liveProsPrice,
-      source: prosDetails.source,
+      tokenPrice: liveTokenPrice,
+      tokenSymbol: tokenSymbol,
+      source: tokenDetails.source,
       fxRate: liveFxRate,
-      prosAmount: parseFloat(prosAmount.toFixed(6)),
+      tokenAmount: parseFloat(tokenAmount.toFixed(6)),
       feeAmount: parseFloat(feeAmount.toFixed(6)),
       feePercent: feeRate / 100,
-      totalPros: parseFloat(totalPros.toFixed(6)),
-      updatedAt: prosDetails.updatedAt,
-      lastUpdated: prosDetails.updatedAt // keep for backwards compatibility
+      totalToken: parseFloat(totalToken.toFixed(6)),
+      updatedAt: tokenDetails.updatedAt,
+      lastUpdated: tokenDetails.updatedAt
     };
 
     res.json({
       success: true,
-      quote,
-      ...quote
+      quote
     });
   } catch (error) {
     res.status(500).json({
@@ -88,7 +92,8 @@ router.get('/quote', async (req, res) => {
  */
 router.get('/rates', async (req, res) => {
   try {
-    const pairs = ['PROS/USD', 'USD/INR', 'USD/BRL', 'USD/SGD', 'USD/USD', 'USD/EUR', 'USD/GBP'];
+    const tokenSymbol = networkConfigService.getPaymentToken().symbol;
+    const pairs = [`${tokenSymbol}/USD`, 'USD/INR', 'USD/BRL', 'USD/SGD', 'USD/USD', 'USD/EUR', 'USD/GBP'];
     const rates = {};
 
     for (const pair of pairs) {

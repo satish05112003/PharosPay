@@ -80,7 +80,7 @@ class EventListener {
             merchantIdentifier: merchantId,
             fiatCurrency,
             fiatAmountX6: (BigInt(fiatAmount) / 1000000000000n).toString(),
-            prosAmount: prosAmount.toString(),
+            tokenAmount: prosAmount.toString(),
             paymentRail,
             country,
             timestamp: Math.floor(Date.now() / 1000),

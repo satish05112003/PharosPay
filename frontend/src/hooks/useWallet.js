@@ -12,7 +12,7 @@ export function useWallet() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [phrsBalance, setPhrsBalance] = useState('0');
-  const [prosBalance, setProsBalance] = useState('0');
+  const [tokenBalance, setTokenBalance] = useState('0');
   const [chainId, setChainId] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSwitchingNetwork, setIsSwitchingNetwork] = useState(false);
@@ -29,9 +29,9 @@ export function useWallet() {
       setPhrsBalance(parseFloat(ethers.formatEther(nativeBal)).toFixed(4));
 
       if (CONTRACTS.MockPROS) {
-        const pros = new ethers.Contract(CONTRACTS.MockPROS, ABI.MockPROS, prov);
-        const prosBal = await pros.balanceOf(addr);
-        setProsBalance(parseFloat(ethers.formatEther(prosBal)).toFixed(4));
+        const token = new ethers.Contract(CONTRACTS.MockPROS, ABI.MockPROS, prov);
+        const tokBal = await token.balanceOf(addr);
+        setTokenBalance(parseFloat(ethers.formatEther(tokBal)).toFixed(4));
       }
     } catch (e) {
       console.warn('Balance check error:', e.message);
@@ -132,7 +132,7 @@ export function useWallet() {
     setProvider(null);
     setSigner(null);
     setPhrsBalance('0');
-    setProsBalance('0');
+    setTokenBalance('0');
     setChainId(null);
     setIsSwitchingNetwork(false);
     localStorage.removeItem('pharos_wallet_connected');
@@ -205,7 +205,7 @@ export function useWallet() {
     provider,
     signer,
     phrsBalance,
-    prosBalance,
+    tokenBalance,
     chainId,
     isConnected,
     isCorrectNetwork,

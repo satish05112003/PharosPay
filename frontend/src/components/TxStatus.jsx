@@ -1,5 +1,5 @@
 import { getExplorerTxUrl } from '../hooks/useContract';
-import { CURRENCIES } from '../config';
+import { CURRENCIES, APP_CONFIG } from '../config';
 
 export default function TxStatus({ result, onReset }) {
   if (!result) return null;

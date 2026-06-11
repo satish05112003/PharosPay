@@ -69,7 +69,7 @@ class SettlementEngine {
   // Called by event listener when PaymentInitiated fires on-chain
   async handlePaymentInitiated(onChainEvent) {
     const { paymentId, payer, merchantIdentifier, fiatAmountX6,
-            fiatCurrency, paymentRail, prosAmount, timestamp } = onChainEvent;
+            fiatCurrency, paymentRail, tokenAmount, timestamp } = onChainEvent;
 
     // Check idempotency: do not process same paymentId twice
     const existing = await this.db.payments.findByPharosPaymentId(paymentId);
@@ -94,34 +94,34 @@ class SettlementEngine {
     }
 
     // Resolve pricing metadata
-    let liveProsPrice = null;
+    let liveTokenPrice = null;
     let liveFxRate = null;
     let priceSource = null;
     let quoteTimestamp = null;
     try {
       const currencyStr = fiatCurrency.toString().toUpperCase();
       // Fetch fresh live rates directly (bypassing oracle caches/circularity)
-      const prosDetails = await priceService.fetchProsUsdPrice();
+      const tokenDetails = await priceService.fetchTokenUsdPrice();
       const fiatDetails = await priceService.fetchUsdRate(currencyStr);
-      liveProsPrice = prosDetails.price;
+      liveTokenPrice = tokenDetails.price;
       liveFxRate = fiatDetails.price;
-      priceSource = prosDetails.source;
-      quoteTimestamp = new Date(prosDetails.updatedAt);
+      priceSource = tokenDetails.source;
+      quoteTimestamp = new Date(tokenDetails.updatedAt);
     } catch (e) {
       console.warn("SettlementEngine: failed to resolve rates for payment creation audit:", e.message);
     }
 
     // Default fallbacks to prevent crash if external APIs are completely down
-    if (!liveProsPrice || liveProsPrice <= 0) liveProsPrice = 0.6144;
+    if (!liveTokenPrice || liveTokenPrice <= 0) liveTokenPrice = 0.6144;
     if (!liveFxRate || liveFxRate <= 0) liveFxRate = 95.1808;
 
     const fiatAmount = Number(fiatAmountX6) / 1e6;
     
     // Single source of truth calculation:
-    // prosAmount = ((fiatAmount / usdInrRate) / prosUsdPrice) * 1.02
-    const finalProsAmount = ((fiatAmount / liveFxRate) / liveProsPrice) * 1.02;
+    const finalTokenAmount = ((fiatAmount / liveFxRate) / liveTokenPrice) * 1.02;
 
     // 2. Create payment record in database
+    const networkConfigService = require('./NetworkConfigService');
     const payment = await this.db.payments.create({
       pharosPaymentId: paymentId,
       userWallet: payer,
@@ -131,19 +131,20 @@ class SettlementEngine {
       paymentRail: paymentRail.toString(),
       fiatAmount: fiatAmount,
       fiatCurrency: fiatCurrency.toString(),
-      prosAmount: finalProsAmount,
-      prosUsdRate: liveProsPrice,
+      tokenAmount: finalTokenAmount,
+      tokenSymbol: networkConfigService.getPaymentToken().symbol,
+      tokenUsdRate: liveTokenPrice,
       usdFiatRate: liveFxRate,
-      prosPriceAtExecution: liveProsPrice,
+      tokenPriceAtExecution: liveTokenPrice,
       fxRateAtExecution: liveFxRate,
       quoteTimestamp,
       priceSource,
-      prosAmountExecuted: finalProsAmount,
+      tokenAmountExecuted: finalTokenAmount,
       usdAmountAtExecution: liveFxRate > 0 ? fiatAmount / liveFxRate : 0,
-      status: 'PROS_LOCKED',
+      status: 'TOKEN_LOCKED',
       idempotencyKey: uuidv4(),
       usdInrRate: liveFxRate,
-      prosUsdPrice: liveProsPrice,
+      tokenUsdPrice: liveTokenPrice,
       feePercent: 2.00,
       timestamp: new Date(),
       pharosLockTx: onChainEvent.pharosLockTx || null
@@ -161,7 +162,7 @@ class SettlementEngine {
     });
 
     await this.logEvent(payment.id, 'SETTLEMENT_QUEUED', 'INITIATED',
-                        'PROS_LOCKED', 'system', {});
+                        'TOKEN_LOCKED', 'system', {});
   }
 
   async processJob(job) {
@@ -172,7 +173,7 @@ class SettlementEngine {
 
     // Step 1: Update status
     await this.db.payments.updateStatus(paymentId, 'SETTLEMENT_STARTED');
-    await this.logEvent(paymentId, 'SETTLEMENT_STARTED', 'PROS_LOCKED', 'SETTLEMENT_STARTED', 'system');
+    await this.logEvent(paymentId, 'SETTLEMENT_STARTED', 'TOKEN_LOCKED', 'SETTLEMENT_STARTED', 'system');
 
     // Step 2: Validate merchant
     const validation = await this.validateMerchant(merchantIdentifier, country, paymentRail);
@@ -186,13 +187,14 @@ class SettlementEngine {
 
     const paymentRecord = await this.db.payments.findById(paymentId);
 
-    // Step 4: Create settlement record
+    const networkConfigService = require('./NetworkConfigService');
     const settlement = await this.db.settlements.create({
       paymentId,
       providerName: provider.name,
       status: 'PENDING',
       isSimulation: provider.isSimulation,
-      prosPriceAtExecution: paymentRecord ? paymentRecord.pros_price_at_execution : null,
+      tokenSymbol: networkConfigService.getPaymentToken().symbol,
+      tokenPriceAtExecution: paymentRecord ? paymentRecord.token_price_at_execution : null,
       fxRateAtExecution: paymentRecord ? paymentRecord.fx_rate_at_execution : null,
       quoteTimestamp: paymentRecord ? paymentRecord.quote_timestamp : null,
       priceSource: paymentRecord ? paymentRecord.price_source : null
@@ -221,7 +223,7 @@ class SettlementEngine {
       httpStatusCode: transferResult.status === 'FAILED' ? 400 : 200,
       errorMessage: transferResult.status === 'FAILED' ? 'Transfer failed' : null,
       durationMs: 100,
-      prosPriceAtExecution: paymentRecord ? paymentRecord.pros_price_at_execution : null,
+      tokenPriceAtExecution: paymentRecord ? paymentRecord.token_price_at_execution : null,
       fxRateAtExecution: paymentRecord ? paymentRecord.fx_rate_at_execution : null,
       quoteTimestamp: paymentRecord ? paymentRecord.quote_timestamp : null,
       priceSource: paymentRecord ? paymentRecord.price_source : null

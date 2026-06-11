@@ -38,6 +38,9 @@ const escalationRoutes = require('./routes/escalation')(db);
 const receiptVerifyRoutes = require('./routes/receiptVerify')(db);
 const adminV2Routes = require('./routes/adminV2')(db);
 
+// Phase 3 Route Builders
+const configRoutes = require('./routes/config');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -126,6 +129,9 @@ app.use('/api/support', supportChatRoutes);
 app.use('/api/support', escalationRoutes);
 app.use('/api/receipts', receiptVerifyRoutes);
 app.use('/api/admin/support', adminV2Routes);
+
+// Register Phase 3 Routes
+app.use('/api/config', configRoutes);
 
 // ─── Health Check ────────────────────────────────────────────────────────
 app.get('/api/health', (_, res) => {

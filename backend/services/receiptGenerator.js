@@ -30,16 +30,17 @@ class ReceiptGenerator {
     const settlement = await this.db.settlements.findByPaymentId(payment.id);
     const beneficiary = payment.merchant_id ? await this.db.beneficiaries.findById(payment.merchant_id) : null;
 
-    const prosPrice = payment.pros_usd_price ? Number(payment.pros_usd_price) : (payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : (payment.pros_usd_rate ? Number(payment.pros_usd_rate) : null));
+    const tokenSymbol = payment.token_symbol || 'PROS';
+    const tokenPrice = payment.token_usd_price ? Number(payment.token_usd_price) : (payment.token_price_at_execution ? Number(payment.token_price_at_execution) : (payment.token_usd_rate ? Number(payment.token_usd_rate) : null));
     const fxRate = payment.usd_inr_rate ? Number(payment.usd_inr_rate) : (payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : (payment.usd_fiat_rate ? Number(payment.usd_fiat_rate) : null));
 
-    if (prosPrice && fxRate) {
-      const expectedPros = (Number(payment.fiat_amount) / fxRate / prosPrice) * 1.02;
-      const storedProsAmount = Number(payment.pros_amount_executed || payment.pros_amount);
-      const difference = Math.abs(expectedPros - storedProsAmount);
-      const differencePercent = (difference / expectedPros) * 100;
+    if (tokenPrice && fxRate) {
+      const expectedToken = (Number(payment.fiat_amount) / fxRate / tokenPrice) * 1.02;
+      const storedTokenAmount = Number(payment.token_amount_executed || payment.token_amount);
+      const difference = Math.abs(expectedToken - storedTokenAmount);
+      const differencePercent = (difference / expectedToken) * 100;
       if (differencePercent > 1) {
-        console.error(`PAYMENT CALCULATION MISMATCH for payment ${payment.id}. Expected: ${expectedPros.toFixed(6)}, Stored: ${storedProsAmount.toFixed(6)} (Diff: ${differencePercent.toFixed(2)}%)`);
+        console.error(`PAYMENT CALCULATION MISMATCH for payment ${payment.id}. Expected: ${expectedToken.toFixed(6)}, Stored: ${storedTokenAmount.toFixed(6)} (Diff: ${differencePercent.toFixed(2)}%)`);
       }
     }
 
@@ -83,14 +84,15 @@ class ReceiptGenerator {
       paymentDetails: {
         fiatAmount: Number(payment.fiat_amount),
         fiatCurrency: payment.fiat_currency,
-        prosAmount: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
-        prosAmountExecuted: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
+        tokenAmount: payment.token_amount_executed ? Number(payment.token_amount_executed) : Number(payment.token_amount),
+        tokenAmountExecuted: payment.token_amount_executed ? Number(payment.token_amount_executed) : Number(payment.token_amount),
         usdAmountAtExecution: payment.usd_amount_at_execution ? Number(payment.usd_amount_at_execution) : null,
         paymentRail: payment.payment_rail,
         country: payment.country,
         status: payment.status,
         timestamp: payment.created_at,
-        prosPriceAtExecution: prosPrice,
+        tokenPriceAtExecution: tokenPrice,
+        tokenSymbol: tokenSymbol,
         fxRateAtExecution: fxRate,
         quoteTimestamp: payment.quote_timestamp || payment.created_at,
         priceSource: payment.price_source || 'Coinbase'
@@ -168,10 +170,11 @@ class ReceiptGenerator {
     // ─── 1. Payment Summary ──────────────────────────────────────
     drawSectionHeader('1. Payment Summary');
     const fiatAmt = Number(receiptData.paymentDetails.fiatAmount).toFixed(2);
-    const prosAmt = Number(receiptData.paymentDetails.prosAmount).toFixed(4);
+    const tokenAmt = Number(receiptData.paymentDetails.tokenAmount).toFixed(4);
+    const tSymbol = receiptData.paymentDetails.tokenSymbol;
     drawRow('Payer Wallet Address', receiptData.payer);
     drawRow('Amount Settled', `${fiatAmt} ${receiptData.paymentDetails.fiatCurrency}`);
-    drawRow('PROS Burned', `${prosAmt} PROS`);
+    drawRow(`${tSymbol} Burned`, `${tokenAmt} ${tSymbol}`);
     drawRow('Payment Rail Method', receiptData.paymentDetails.paymentRail);
 
     // ─── 2. Merchant Information ─────────────────────────────────
@@ -191,11 +194,11 @@ class ReceiptGenerator {
 
     // ─── 4. Financial Breakdown ──────────────────────────────────
     drawSectionHeader('4. Financial Breakdown');
-    const prosPrice = Number(receiptData.paymentDetails.prosPriceAtExecution).toFixed(4);
+    const tokenPrice = Number(receiptData.paymentDetails.tokenPriceAtExecution).toFixed(4);
     const fxRate = Number(receiptData.paymentDetails.fxRateAtExecution).toFixed(4);
     drawRow('Base Fiat Amount', `${fiatAmt} ${receiptData.paymentDetails.fiatCurrency}`);
     drawRow('Platform Fee (2.0%)', `${(fiatAmt * 0.02).toFixed(2)} ${receiptData.paymentDetails.fiatCurrency}`);
-    drawRow('PROS/USD Price', `$${prosPrice}`);
+    drawRow(`${tSymbol}/USD Price`, `$${tokenPrice}`);
     drawRow(`Exchange Rate (USD/${receiptData.paymentDetails.fiatCurrency})`, fxRate);
     drawRow('Execution Oracle Source', receiptData.paymentDetails.priceSource);
 
@@ -251,7 +254,7 @@ class ReceiptGenerator {
     doc.fontSize(9).font('Helvetica-Bold').fillColor('#0f172a').text('PharosPay', { align: 'center' });
     doc.fontSize(8.5).font('Helvetica').fillColor('#64748b').text('Secure Cross-Border Payments on Pharos Blockchain', { align: 'center' });
     doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8').text('This receipt was generated automatically and can be verified online.', { align: 'center' });
-    doc.text('Verify: https://atlantic.pharosscan.xyz', { align: 'center' });
+    doc.text('Verify: https://pharosscan.xyz', { align: 'center' });
 
     doc.end();
     return doc;
@@ -263,15 +266,17 @@ class ReceiptGenerator {
   async generateShareableReceipt(paymentId) {
     const receipt = await this.generateJsonReceipt(paymentId);
 
+    const tSymbol = receipt.paymentDetails.tokenSymbol;
     return {
       title: 'PharosPay Payment Receipt',
       ticketNumber: receipt.referenceNumber || receipt.receiptId,
-      summary: `${receipt.paymentDetails.fiatAmount} ${receipt.paymentDetails.fiatCurrency} → ${Number(receipt.paymentDetails.prosAmount).toFixed(4)} PROS`,
+      summary: `${receipt.paymentDetails.fiatAmount} ${receipt.paymentDetails.fiatCurrency} → ${Number(receipt.paymentDetails.tokenAmount).toFixed(4)} ${tSymbol}`,
       merchant: receipt.merchant.name,
       status: receipt.paymentDetails.status,
       timestamp: receipt.paymentDetails.timestamp,
       utr: receipt.utr,
-      prosPrice: receipt.paymentDetails.prosPriceAtExecution,
+      tokenPrice: receipt.paymentDetails.tokenPriceAtExecution,
+      tokenSymbol: tSymbol,
       fxRate: receipt.paymentDetails.fxRateAtExecution,
       priceSource: receipt.paymentDetails.priceSource,
       blockchainProof: {
@@ -288,6 +293,7 @@ class ReceiptGenerator {
   async generateEmailReceipt(paymentId, recipientEmail) {
     const receipt = await this.generateJsonReceipt(paymentId);
 
+    const tSymbol = receipt.paymentDetails.tokenSymbol;
     const emailBody = {
       to: recipientEmail,
       subject: `PharosPay Receipt | ${receipt.paymentDetails.fiatAmount} ${receipt.paymentDetails.fiatCurrency} Payment`,
@@ -297,13 +303,13 @@ class ReceiptGenerator {
         `Here is your PharosPay payment receipt:`,
         ``,
         `Amount: ${receipt.paymentDetails.fiatAmount} ${receipt.paymentDetails.fiatCurrency}`,
-        `PROS Paid: ${Number(receipt.paymentDetails.prosAmount).toFixed(4)} PROS`,
+        `${tSymbol} Paid: ${Number(receipt.paymentDetails.tokenAmount).toFixed(4)} ${tSymbol}`,
         `Merchant: ${receipt.merchant.name}`,
         `Status: ${receipt.paymentDetails.status}`,
         `Date: ${new Date(receipt.paymentDetails.timestamp).toLocaleString()}`,
         `UTR: ${receipt.utr || 'N/A'}`,
         ``,
-        `PROS Price: $${Number(receipt.paymentDetails.prosPriceAtExecution).toFixed(4)}`,
+        `${tSymbol} Price: $${Number(receipt.paymentDetails.tokenPriceAtExecution).toFixed(4)}`,
         `FX Rate: ${Number(receipt.paymentDetails.fxRateAtExecution).toFixed(4)}`,
         `Source: ${receipt.paymentDetails.priceSource}`,
         ``,

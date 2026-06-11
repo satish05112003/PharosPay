@@ -30,7 +30,7 @@ export default function ContextPreview({ wallet, sessionId }) {
         const paymentsData = await paymentsRes.json();
 
         const allPayments = paymentsData.payments || [];
-        const pending = allPayments.filter(p => ['PROS_LOCKED', 'SETTLEMENT_STARTED', 'SETTLEMENT_PROCESSING'].includes(p.status));
+        const pending = allPayments.filter(p => ['TOKEN_LOCKED', 'SETTLEMENT_STARTED', 'SETTLEMENT_PROCESSING'].includes(p.status));
         const failed = allPayments.filter(p => ['SETTLEMENT_FAILED', 'REFUNDED'].includes(p.status));
         const recent = allPayments.slice(0, 5);
 

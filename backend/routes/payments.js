@@ -28,8 +28,9 @@ module.exports = (db) => {
         merchantName: s.metadata?.merchantName || s.merchant_identifier,
         fiatCurrency: s.fiat_currency,
         fiatAmount: Number(s.fiat_amount),
-        prosAmount: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
-        prosAmountExecuted: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
+        tokenSymbol: s.token_symbol,
+        tokenAmount: s.token_amount_executed ? Number(s.token_amount_executed) : Number(s.token_amount),
+        tokenAmountExecuted: s.token_amount_executed ? Number(s.token_amount_executed) : Number(s.token_amount),
         usdAmountAtExecution: s.usd_amount_at_execution ? Number(s.usd_amount_at_execution) : null,
         feeAmount: s.metadata?.feeAmount || '0.0000',
         paymentRail: s.payment_rail,
@@ -38,7 +39,7 @@ module.exports = (db) => {
         status: s.status,
         utr: s.utr,
         referenceNumber: s.reference_number,
-        prosPriceAtExecution: s.pros_price_at_execution ? Number(s.pros_price_at_execution) : (s.pros_usd_rate ? Number(s.pros_usd_rate) : null),
+        tokenPriceAtExecution: s.token_price_at_execution ? Number(s.token_price_at_execution) : (s.token_usd_rate ? Number(s.token_usd_rate) : null),
         fxRateAtExecution: s.fx_rate_at_execution ? Number(s.fx_rate_at_execution) : (s.usd_fiat_rate ? Number(s.usd_fiat_rate) : null),
         priceSource: s.price_source || 'Coinbase',
         quoteTimestamp: s.quote_timestamp || s.created_at
@@ -87,15 +88,16 @@ module.exports = (db) => {
           paymentRail: payment.payment_rail,
           fiatAmount: Number(payment.fiat_amount),
           fiatCurrency: payment.fiat_currency,
-          prosAmount: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
-          prosAmountExecuted: payment.pros_amount_executed ? Number(payment.pros_amount_executed) : Number(payment.pros_amount),
+          tokenSymbol: payment.token_symbol,
+          tokenAmount: payment.token_amount_executed ? Number(payment.token_amount_executed) : Number(payment.token_amount),
+          tokenAmountExecuted: payment.token_amount_executed ? Number(payment.token_amount_executed) : Number(payment.token_amount),
           usdAmountAtExecution: payment.usd_amount_at_execution ? Number(payment.usd_amount_at_execution) : null,
           status: payment.status,
           created_at: payment.created_at,
           utr: settlement ? settlement.utr : null,
           referenceNumber: settlement ? settlement.reference_number : null,
           settlementStatus: settlement ? settlement.status : null,
-          prosPriceAtExecution: payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : (payment.pros_usd_rate ? Number(payment.pros_usd_rate) : null),
+          tokenPriceAtExecution: payment.token_price_at_execution ? Number(payment.token_price_at_execution) : (payment.token_usd_rate ? Number(payment.token_usd_rate) : null),
           fxRateAtExecution: payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : (payment.usd_fiat_rate ? Number(payment.usd_fiat_rate) : null),
           priceSource: payment.price_source || 'Coinbase',
           quoteTimestamp: payment.quote_timestamp || payment.created_at
@@ -126,26 +128,26 @@ module.exports = (db) => {
 
       const fiatAmount = Number(payment.fiat_amount);
       const usdInrRate = payment.usd_inr_rate ? Number(payment.usd_inr_rate) : (payment.fx_rate_at_execution ? Number(payment.fx_rate_at_execution) : (payment.usd_fiat_rate ? Number(payment.usd_fiat_rate) : null));
-      const prosUsdPrice = payment.pros_usd_price ? Number(payment.pros_usd_price) : (payment.pros_price_at_execution ? Number(payment.pros_price_at_execution) : (payment.pros_usd_rate ? Number(payment.pros_usd_rate) : null));
-      const storedProsAmount = Number(payment.pros_amount_executed || payment.pros_amount);
+      const tokenUsdPrice = payment.token_usd_price ? Number(payment.token_usd_price) : (payment.token_price_at_execution ? Number(payment.token_price_at_execution) : (payment.token_usd_rate ? Number(payment.token_usd_rate) : null));
+      const storedTokenAmount = Number(payment.token_amount_executed || payment.token_amount);
       const feePercent = payment.fee_percent ? Number(payment.fee_percent) : 2.00;
 
-      let expectedProsAmount = null;
+      let expectedTokenAmount = null;
       let differencePercent = null;
 
-      if (usdInrRate && prosUsdPrice) {
-        expectedProsAmount = Number((((fiatAmount / usdInrRate) / prosUsdPrice) * 1.02).toFixed(6));
-        const diff = Math.abs(storedProsAmount - expectedProsAmount);
-        differencePercent = Number(((diff / expectedProsAmount) * 100).toFixed(6));
+      if (usdInrRate && tokenUsdPrice) {
+        expectedTokenAmount = Number((((fiatAmount / usdInrRate) / tokenUsdPrice) * 1.02).toFixed(6));
+        const diff = Math.abs(storedTokenAmount - expectedTokenAmount);
+        differencePercent = Number(((diff / expectedTokenAmount) * 100).toFixed(6));
       }
 
       res.json({
         fiatAmount,
         usdInrRate,
-        prosUsdPrice,
+        tokenUsdPrice,
         feePercent,
-        storedProsAmount,
-        expectedProsAmount,
+        storedTokenAmount,
+        expectedTokenAmount,
         differencePercent
       });
     } catch (err) {

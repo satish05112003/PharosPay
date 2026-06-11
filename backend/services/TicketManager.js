@@ -32,7 +32,7 @@ class TicketManager {
       },
       {
         category: 'pricing_issue',
-        keywords: ['price wrong', 'wrong rate', 'incorrect price', 'pros price',
+        keywords: ['price wrong', 'wrong rate', 'incorrect price', 'token price',
           'exchange rate', 'fx rate wrong', 'conversion wrong', 'overcharged',
           'price mismatch', 'stale price', 'market data', 'coinbase']
       },

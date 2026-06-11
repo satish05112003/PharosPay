@@ -8,17 +8,17 @@ class PharosKnowledgeService {
       },
       PHAROSPAY: {
         title: "PharosPay Payments Infrastructure",
-        content: "PharosPay is a global crypto-to-fiat payment protocol built natively on the Pharos blockchain. It connects on-chain liquidity directly to traditional, off-chain legacy payment networks (like India's UPI, Brazil's PIX, Singapore's PayNow, USA's ACH, and Europe's SEPA). Users scan standard merchant QR codes and pay with $PROS tokens. The payment engine processes the transaction on-chain and initiates fiat payouts directly to the merchant's local bank account with zero crypto exposure or volatility risk for the merchant.",
+        content: "PharosPay is a global crypto-to-fiat payment protocol built natively on the Pharos blockchain. It connects on-chain liquidity directly to traditional, off-chain legacy payment networks (like India's UPI, Brazil's PIX, Singapore's PayNow, USA's ACH, and Europe's SEPA). Users scan standard merchant QR codes and pay with supported payment tokens. The payment engine processes the transaction on-chain and initiates fiat payouts directly to the merchant's local bank account with zero crypto exposure or volatility risk for the merchant.",
         links: ["Official Website: https://www.pharos.xyz/"]
       },
       PAYMENTS: {
         title: "Making Payments & Transaction History",
-        content: "PharosPay lets users pay merchants directly in their local fiat currency using $PROS tokens. The user scans a merchant QR code, gets a real-time price quote from the PriceOracle contract (taking a 2% fee deposited to the FeeVault contract), and signs the MetaMask transaction on Pharos. Transaction history, including merchant names, fiat amounts, payment rails, and block hashes, can be viewed under the History tab.",
+        content: "PharosPay lets users pay merchants directly in their local fiat currency using payment tokens. The user scans a merchant QR code, gets a real-time price quote from the PriceOracle contract (taking a 2% fee deposited to the FeeVault contract), and signs the MetaMask transaction on Pharos. Transaction history, including merchant names, fiat amounts, payment rails, and block hashes, can be viewed under the History tab.",
         links: ["Explorer: https://pharosscan.xyz/"]
       },
       SETTLEMENTS: {
         title: "Cross-Border settlements & Payout Rails",
-        content: "In PharosPay, once PROS tokens are locked on-chain by the user, the settlement engine automatically routes the payment. Payouts clear via instant payment rails like UPI (India) and PIX (Brazil) in under 10 seconds. For rails like ACH (USA) or SEPA (Europe), settlements typically clear within 1-3 business days. If a payout fail state occurs, locked PROS tokens are automatically refunded to the user's wallet.",
+        content: "In PharosPay, once payment tokens are locked on-chain by the user, the settlement engine automatically routes the payment. Payouts clear via instant payment rails like UPI (India) and PIX (Brazil) in under 10 seconds. For rails like ACH (USA) or SEPA (Europe), settlements typically clear within 1-3 business days. If a payout fail state occurs, locked tokens are automatically refunded to the user's wallet.",
         links: []
       },
       RECEIPTS: {
@@ -28,7 +28,7 @@ class PharosKnowledgeService {
       },
       WALLETS: {
         title: "Wallet Configurations & MetaMask Setup",
-        content: "PharosPay supports MetaMask and other EVM-compatible Web3 wallets. Ensure your wallet is configured to the Pharos Atlantic Testnet (Chain ID: 688689) to view your PROS balance and confirm transaction prompts. Native gas fees are paid in PHAROS tokens.",
+        content: "PharosPay supports MetaMask and other EVM-compatible Web3 wallets. Ensure your wallet is configured to the Pharos Network to view your token balance and confirm transaction prompts. Native gas fees are paid in PHAROS tokens.",
         links: []
       },
       SUPPORT: {
@@ -82,7 +82,7 @@ class PharosKnowledgeService {
       PAYMENTS: ['payment', 'pay', 'paid', 'transact', 'send money', 'charge', 'cost', 'spend', 'history', 'tx', 'hash', 'allowance', 'confirm'],
       SETTLEMENTS: ['settle', 'settlement', 'payout', 'bank transfer', 'bank account', 'processing', 'completed', 'failed', 'refund', 'revert'],
       RECEIPTS: ['receipt', 'pdf', 'verify receipt', 'reference number', 'reference_number', 'invoice', 'report', 'suspicious'],
-      WALLETS: ['wallet', 'metamask', 'address', 'connect', 'balance', 'pros balance', 'gas', 'private key', 'seed phrase'],
+      WALLETS: ['wallet', 'metamask', 'address', 'connect', 'balance', 'token balance', 'gas', 'private key', 'seed phrase'],
       SUPPORT: ['support', 'help', 'ticket', 'escalate', 'human', 'agent', 'issue', 'error', 'failed', 'unavailable', 'hi', 'hello', 'hey', 'what is this', 'how does it work', 'who are you', 'what can you do', 'thanks', 'thank you', 'bye', 'goodbye', 'good morning', 'good evening', 'how are you', 'ok', 'okay', 'yes', 'no', 'lost', 'missing', 'wrong', 'stuck', 'problem', 'broken'],
       BLOCKCHAIN_EXPLORER: ['explorer', 'pharosscan', 'scan', 'transaction explorer', 'verify on-chain', 'event', 'emitted'],
       TESTNET: ['testnet', 'atlantic', 'rpc', 'chain id', 'chain_id', 'atlantic testnet', 'faucet', 'mint'],

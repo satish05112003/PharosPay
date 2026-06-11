@@ -241,14 +241,13 @@ export default function useAIChat(wallet, sessionId) {
     } catch (err) {
       setTyping(false);
       setError(err.message);
-      const isAiError = err.message === 'AI provider timeout' || err.message.includes('API key') || err.message.includes('unavailable') || err.message.includes('provider');
       setMessages(prev => [
         ...prev,
         {
           id: 'err_submit_' + Date.now(),
           senderType: 'ai',
           senderName: 'Pharos',
-          content: isAiError ? 'AI assistant is currently unavailable. Please try again.' : `Error: ${err.message}`,
+          content: `Support service unavailable. Please try again in a moment.\n\nTechnical Diagnostics: ${err.message}`,
           createdAt: new Date().toISOString()
         }
       ]);

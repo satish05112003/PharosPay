@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
-import { CONTRACTS, ABI, CURRENCIES, API_BASE } from '../config';
-import { formatPROS, parseFiatAmount, getExplorerTxUrl } from '../hooks/useContract';
+import { CONTRACTS, ABI, CURRENCIES, API_BASE, APP_CONFIG } from '../config';
+import { formatTokenAmount, parseFiatAmount, getExplorerTxUrl } from '../hooks/useContract';
 import { Ic } from '../components/Icons';
 import { usePayments } from '../context/PaymentContext';
 import ReceiptViewer from '../components/ReceiptViewer';
@@ -503,7 +503,7 @@ export default function Pay({ wallet }) {
         <div>
           <h2 style={{ fontSize: "20px", fontWeight: 800, color: "var(--text)", margin: 0 }}>Payment Wizard</h2>
           <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0 }}>
-            Instant local fiat settlement with $PROS tokens
+            Instant local fiat settlement with PROS tokens
           </p>
         </div>
       </div>
@@ -900,7 +900,7 @@ export default function Pay({ wallet }) {
               ["Recipient", `${selectedCountryInfo.flag} ${merchantName || 'Merchant Store'} (${method})`],
               ["Merchant Identifier", merchantId],
               ["Local Amount", `${parseFloat(amount).toFixed(2)} ${selectedCountryInfo.currency}`],
-              ["PROS Exchange Cost", `${quote.merchantPros} PROS`],
+              [`PROS Exchange Cost`, `${quote.merchantPros} PROS`],
               ["Platform Fee", `${quote.feeAmount} PROS`],
               ["Total Charge", `${quote.totalPros} PROS`],
               ...(verifiedMerchant ? [

@@ -9,7 +9,7 @@ module.exports = (settlementEngine, db) => {
    */
   router.post('/settle', async (req, res) => {
     try {
-      const { paymentId, txHash, merchantId, merchantName, amount, currency, paymentRail, country, payer, prosAmount } = req.body;
+      const { paymentId, txHash, merchantId, merchantName, amount, currency, paymentRail, country, payer, tokenAmount } = req.body;
 
       if (!paymentId || !merchantId || !amount || !currency || !paymentRail) {
         return res.status(400).json({
@@ -27,7 +27,7 @@ module.exports = (settlementEngine, db) => {
         merchantIdentifier: merchantId,
         fiatCurrency: currency,
         fiatAmountX6: String(Math.round(Number(amount) * 1e6)),
-        prosAmount: prosAmount ? ethers.parseEther(prosAmount.toString()).toString() : '0',
+        tokenAmount: tokenAmount ? ethers.parseEther(tokenAmount.toString()).toString() : '0',
         paymentRail,
         country: country || 'US',
         timestamp: Math.floor(Date.now() / 1000),
@@ -90,8 +90,9 @@ module.exports = (settlementEngine, db) => {
         merchantName: s.metadata?.merchantName || s.merchant_identifier,
         fiatCurrency: s.fiat_currency,
         fiatAmount: Number(s.fiat_amount),
-        prosAmount: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
-        prosAmountExecuted: s.pros_amount_executed ? Number(s.pros_amount_executed) : Number(s.pros_amount),
+        tokenSymbol: s.token_symbol,
+        tokenAmount: s.token_amount_executed ? Number(s.token_amount_executed) : Number(s.token_amount),
+        tokenAmountExecuted: s.token_amount_executed ? Number(s.token_amount_executed) : Number(s.token_amount),
         usdAmountAtExecution: s.usd_amount_at_execution ? Number(s.usd_amount_at_execution) : null,
         feeAmount: s.metadata?.feeAmount || '0.0000',
         paymentRail: s.payment_rail,
@@ -100,7 +101,7 @@ module.exports = (settlementEngine, db) => {
         status: s.status,
         utr: s.utr,
         referenceNumber: s.reference_number,
-        prosPriceAtExecution: s.pros_price_at_execution ? Number(s.pros_price_at_execution) : (s.pros_usd_rate ? Number(s.pros_usd_rate) : null),
+        tokenPriceAtExecution: s.token_price_at_execution ? Number(s.token_price_at_execution) : (s.token_usd_rate ? Number(s.token_usd_rate) : null),
         fxRateAtExecution: s.fx_rate_at_execution ? Number(s.fx_rate_at_execution) : (s.usd_fiat_rate ? Number(s.usd_fiat_rate) : null),
         quoteTimestamp: s.quote_timestamp || s.created_at,
         priceSource: s.price_source || 'Coinbase'

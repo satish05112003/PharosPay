@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { API_BASE, CONTRACTS, ABI } from '../config';
-import { formatPROS } from '../hooks/useContract';
+import { formatTokenAmount } from '../hooks/useContract';
 
 const PaymentContext = createContext();
 
@@ -70,7 +70,7 @@ export function PaymentProvider({ children, wallet }) {
         const currentGlobalCount = Number(count);
         const gStats = {
           paymentCount: currentGlobalCount,
-          volume: formatPROS(volume),
+          volume: formatTokenAmount(volume),
           feeRate: Number(feeRate),
         };
         setGlobalStats(gStats);
@@ -100,8 +100,8 @@ export function PaymentProvider({ children, wallet }) {
               merchantName: p.merchantName,
               fiatCurrency: p.fiatCurrency,
               fiatAmount: parseFloat(ethers.formatEther(p.fiatAmount)),
-              prosAmount: formatPROS(p.prosAmount),
-              feeAmount: matchedBackend?.feeAmount || formatPROS(p.feeAmount),
+              prosAmount: formatTokenAmount(p.prosAmount),
+              feeAmount: matchedBackend?.feeAmount || formatTokenAmount(p.feeAmount),
               paymentRail: p.paymentRail,
               country: p.country,
               timestamp: new Date(Number(p.timestamp) * 1000),

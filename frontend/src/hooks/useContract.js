@@ -28,9 +28,9 @@ export function useContract(provider, signer) {
 }
 
 /**
- * Helper: Format PROS amount for display
+ * Helper: Format token amount for display
  */
-export function formatPROS(weiAmount) {
+export function formatTokenAmount(weiAmount) {
   if (!weiAmount) return '0';
   return parseFloat(ethers.formatEther(weiAmount)).toFixed(4);
 }
