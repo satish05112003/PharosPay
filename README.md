@@ -9,6 +9,7 @@ Cross-border and retail payments remain fragmented globally. Different jurisdict
 * Brazil uses PIX
 * Singapore uses PayNow
 * The United States uses ACH (Automated Clearing House)
+* And many other countries
 
 Traditional cross-border settlement solutions are slow, expensive, and involve multiple intermediary correspondent banks. While public blockchains solve the transfer-of-value layer, they do not bridge the gap to real-world fiat settlement at retail points-of-sale. Merchants cannot easily accept raw cryptocurrency due to regulatory, volatility, and technical barriers. PharosPay bridges this gap by enabling consumers to pay in tokens and merchants to receive local bank settlement.
 
