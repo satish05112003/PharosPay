@@ -1,6 +1,6 @@
 # PharosPay
 
-PharosPay is a global crypto-to-fiat payment system on the Pharos blockchain. It allows users to pay local merchants using PROS tokens while merchants receive local fiat currency directly in their standard bank accounts or retail accounts. The system parses standard local QR formats, resolves real-time exchange rates, processes payments on-chain, and orchestrates settlement execution through country-specific payout rails.
+PharosPay is a global crypto-to-fiat payment system on the Pharos blockchain. It allows users to pay local merchants using PROS tokens while merchants receive local fiat currency directly in their standard bank accounts or retail accounts. The system parses standard local QR formats, resolves real-time exchange rates, processes payments on-chain, and orchestrates settlement execution through country-specific payout rails
 
 ## Problem
 
